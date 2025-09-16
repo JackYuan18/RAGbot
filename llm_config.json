@@ -1,0 +1,38 @@
+{
+  "openai": {
+    "provider": "openai",
+    "model_name": "gpt-5",
+    "api_key": null,
+    "base_url": null,
+    "max_tokens": 1000,
+    "temperature": 0.7,
+    "timeout": 30
+  },
+  "grok": {
+    "provider": "grok",
+    "model_name": "grok-3",
+    "api_key": null,
+    "base_url": null,
+    "max_tokens": 1000,
+    "temperature": 0.7,
+    "timeout": 30
+  },
+  "local": {
+    "provider": "local",
+    "model_name": "t5-small",
+    "api_key": null,
+    "base_url": null,
+    "max_tokens": 1000,
+    "temperature": 0.7,
+    "timeout": 30
+  },
+  "mock": {
+    "provider": "mock",
+    "model_name": "mock-model",
+    "api_key": null,
+    "base_url": null,
+    "max_tokens": 1000,
+    "temperature": 0.7,
+    "timeout": 30
+  }
+}

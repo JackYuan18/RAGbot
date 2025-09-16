@@ -1,0 +1,12 @@
+PyPDF2>=2.0.0
+torch==1.13.1+cu117
+torchvision==0.14.1+cu117
+torchaudio==0.13.1+cu117
+transformers==4.21.0
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.0
+numpy>=1.19.0
+flask>=2.0.0
+huggingface-hub>=0.10.0
+openai>=1.0.0
+requests>=2.25.0

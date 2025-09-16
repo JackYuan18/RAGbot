@@ -9,12 +9,11 @@ Created on Mon Sep  8 16:13:39 2025
 import PyPDF2
 import os
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
-import torch
+import torch as pytorch
 from huggingface_hub import login
 from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
-import torch
 def extract_text_from_pdf(pdf_path):
     """Extract text from a single PDF file."""
     try:
@@ -75,7 +74,7 @@ if __name__=="__main__":
     print(len(documents))
     
     # Load a pre-trained sentence transformer model
-    retriever_model = SentenceTransformer('all-MiniLM-L6-v2', device='cuda' if torch.cuda.is_available() else 'cpu')
+    retriever_model = SentenceTransformer('all-MiniLM-L6-v2', device='cuda' if pytorch.cuda.is_available() else 'cpu')
     # Encode the documents
     document_embeddings = retriever_model.encode(documents, convert_to_numpy=True)
     
@@ -87,8 +86,8 @@ if __name__=="__main__":
     
     
     # Check if GPU is available
-    device = 0 if torch.cuda.is_available() else -1
-    print(torch.cuda.is_available())  # Should print: True
+    device = 0 if pytorch.cuda.is_available() else -1
+    print(pytorch.cuda.is_available())  # Should print: True
     
     # Load a generative model
     # model_name = "mistralai/Mistral-7B-Instruct-v0.3"

@@ -1,70 +1,218 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RAG Chatbot</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .sidebar {
+            transition: transform 0.3s ease;
+        }
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+        .file-item:hover {
+            background-color: #f3f4f6;
+        }
+        .file-item.selected {
+            background-color: #dbeafe;
+        }
+        .directory-tree {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 h-screen flex flex-col">
-    <div class="container mx-auto p-4 flex-grow">
-        <h1 class="text-2xl font-bold mb-4 text-center">RAG Chatbot</h1>
-        <div id="chat-container" class="bg-white rounded-lg shadow-md p-4 h-96 overflow-y-auto mb-4">
-            <div id="chat-messages"></div>
+<body class="bg-gray-100 h-screen flex">
+    <!-- Sidebar -->
+    <div id="sidebar" class="sidebar w-80 bg-white shadow-lg flex flex-col">
+        <!-- Sidebar Header -->
+        <div class="p-4 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-800">Database</h2>
+                <div class="flex space-x-2">
+                    <button id="upload-btn" class="p-2 text-blue-600 hover:bg-blue-50 rounded" title="Upload Files">
+                        <i class="fas fa-upload"></i>
+                    </button>
+                    <button id="new-folder-btn" class="p-2 text-green-600 hover:bg-green-50 rounded" title="New Folder">
+                        <i class="fas fa-folder-plus"></i>
+                    </button>
+                    <button id="refresh-rag-btn" class="p-2 text-purple-600 hover:bg-purple-50 rounded" title="Refresh RAG System">
+                        <i class="fas fa-brain"></i>
+                    </button>
+                    <button id="refresh-btn" class="p-2 text-gray-600 hover:bg-gray-50 rounded" title="Refresh File List">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Upload Progress Section -->
+            <div id="upload-progress-section" class="mt-3 hidden">
+                <div class="text-sm text-gray-600 mb-2">
+                    <span id="upload-status">Uploading files...</span>
+                    <span id="upload-count" class="ml-2"></span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="upload-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div class="text-xs text-gray-500 mt-1">
+                    <span id="upload-speed"></span>
+                    <span id="upload-time" class="ml-2"></span>
+                </div>
+            </div>
+            
+            <!-- Language Model Selection -->
+            <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+                <h3 class="text-sm font-medium text-gray-700 mb-2">Language Model</h3>
+                <div class="space-y-2">
+                    <div class="flex items-center space-x-2">
+                        <input type="radio" id="use-local" name="model-type" value="local" checked class="text-blue-600">
+                        <label for="use-local" class="text-xs text-gray-600">Local T5-Small</label>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <input type="radio" id="use-chatgpt5" name="model-type" value="chatgpt5" class="text-blue-600">
+                        <label for="use-chatgpt5" class="text-xs text-gray-600">ChatGPT 5 (API)</label>
+                    </div>
+                    
+                    <!-- API Key Input (shown when ChatGPT 5 is selected) -->
+                    <div id="api-key-section" class="hidden">
+                        <label for="api-key-input" class="block text-xs text-gray-600 mb-1">OpenAI API Key:</label>
+                        <div class="flex space-x-2">
+                            <input type="password" id="api-key-input" placeholder="Enter your OpenAI API key" 
+                                   class="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            <button id="validate-api-btn" class="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors">Validate</button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Your API key is stored locally and not sent to our servers.</p>
+                        <div id="api-validation-status" class="mt-2 text-xs hidden"></div>
+                    </div>
+                    
+                    <div id="model-status" class="text-xs text-gray-600">
+                        <p>Using Local T5-Small Model</p>
+                        <p class="text-green-600">✓ GPU Accelerated</p>
+                    </div>
+                    <button id="toggle-model-btn" class="w-full bg-blue-600 text-white text-xs px-2 py-1 rounded hover:bg-blue-700">
+                        Switch Model
+                    </button>
+                </div>
+            </div>
         </div>
-        <div class="flex">
-            <input type="text" id="user-input" class="flex-grow p-2 border rounded-l-lg focus:outline-none" placeholder="Type your message...">
-            <button id="send-btn" class="bg-blue-500 text-white p-2 rounded-r-lg hover:bg-blue-600">Send</button>
+
+        <!-- Directory Tree -->
+        <div class="flex-1 p-4">
+            <div id="directory-tree" class="directory-tree">
+                <div class="text-gray-500 text-sm">Loading...</div>
+            </div>
+            
+            <!-- Drag and Drop Zone -->
+            <div id="drop-zone" class="mt-4 p-4 border-2 border-dashed border-gray-300 rounded-lg text-center hidden">
+                <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-2"></i>
+                <p class="text-sm text-gray-600">Drop PDF files here to upload</p>
+            </div>
+        </div>
+
+        <!-- Sidebar Footer -->
+        <div class="p-4 border-t border-gray-200">
+            <div class="text-xs text-gray-500">
+                <div id="file-count">0 files</div>
+                <div id="system-status" class="mt-1">System: Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+        <!-- Header -->
+        <div class="bg-white shadow-sm border-b border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <button id="sidebar-toggle" class="p-2 text-gray-600 hover:bg-gray-100 rounded">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="text-2xl font-bold text-gray-800">RAG Chatbot</h1>
+                </div>
+                <div class="text-sm text-gray-500">
+                    <span id="current-directory">Root</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="flex-1 p-4 flex flex-col">
+            <div id="chat-container" class="bg-white rounded-lg shadow-md p-4 flex-1 overflow-y-auto mb-4">
+                <div id="chat-messages"></div>
+            </div>
+            <div class="flex">
+                <input type="text" id="user-input" class="flex-grow p-3 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Type your message...">
+                <button id="send-btn" class="bg-blue-500 text-white p-3 rounded-r-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden file input -->
+    <input type="file" id="file-input" multiple accept=".pdf" style="display: none;">
+
+    <!-- Notification Toast -->
+    <div id="notification-toast" class="fixed top-4 right-4 z-50 hidden">
+        <div class="bg-white rounded-lg shadow-lg border-l-4 p-4 max-w-sm">
+            <div class="flex items-center">
+                <div id="notification-icon" class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-blue-500"></i>
+                </div>
+                <div class="ml-3">
+                    <p id="notification-message" class="text-sm font-medium text-gray-900"></p>
+                </div>
+                <div class="ml-auto pl-3">
+                    <button onclick="hideNotification()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
+        // Global variables
+        let currentDirectory = '';
+        let selectedFile = null;
+        let directories = {};
+        let documents = [];
+        let uploadStartTime = null;
+        let uploadProgressInterval = null;
+
+        // DOM elements
         const chatMessages = document.getElementById('chat-messages');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const directoryTree = document.getElementById('directory-tree');
+        const fileCount = document.getElementById('file-count');
+        const systemStatus = document.getElementById('system-status');
+        const currentDirectorySpan = document.getElementById('current-directory');
+        const uploadBtn = document.getElementById('upload-btn');
+        const newFolderBtn = document.getElementById('new-folder-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const refreshRagBtn = document.getElementById('refresh-rag-btn');
+        const fileInput = document.getElementById('file-input');
+        const uploadProgressSection = document.getElementById('upload-progress-section');
+        const uploadStatus = document.getElementById('upload-status');
+        const uploadCount = document.getElementById('upload-count');
+        const uploadProgressBar = document.getElementById('upload-progress-bar');
+        const uploadSpeed = document.getElementById('upload-speed');
+        const uploadTime = document.getElementById('upload-time');
+        const notificationToast = document.getElementById('notification-toast');
+        const notificationIcon = document.getElementById('notification-icon');
+        const notificationMessage = document.getElementById('notification-message');
+        const dropZone = document.getElementById('drop-zone');
 
+        // Chat functionality
         function addMessage(message, isUser = false) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = `p-2 my-1 rounded-lg ${isUser ? 'bg-blue-100 ml-auto' : 'bg-gray-200'} max-w-xs`;
+            messageDiv.className = `p-3 my-2 rounded-lg ${isUser ? 'bg-blue-100 ml-auto' : 'bg-gray-200'} max-w-xs`;
             messageDiv.textContent = message;
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -84,21 +232,792 @@
                     });
                     const data = await response.json();
                     addMessage(data.response);
+                    
+                    // Display sources if available
+                    if (data.sources && data.sources.length > 0) {
+                        displaySources(data.sources);
+                    }
                 } catch (error) {
                     addMessage('Error: ' + error.message);
                 }
             }
         }
 
-        sendBtn.addEventListener('click', sendMessage);
+        function displaySources(sources) {
+            const sourcesDiv = document.createElement('div');
+            sourcesDiv.className = 'mt-3 p-3 bg-gray-50 rounded-lg border-l-4 border-blue-500';
+            
+            let sourcesHTML = '<h4 class="text-sm font-semibold text-gray-700 mb-2">📚 Sources:</h4>';
+            sourcesHTML += '<div class="space-y-2">';
+            
+            sources.forEach((source, index) => {
+                const relevancePercent = Math.round(source.relevance_score * 100);
+                sourcesHTML += `
+                    <div class="flex items-start space-x-2 p-2 bg-white rounded border">
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <h5 class="text-sm font-medium text-blue-600 cursor-pointer hover:underline" 
+                                    onclick="openDocumentFile('${source.filename}')" title="Click to open full document">
+                                    ${source.filename}
+                                </h5>
+                                <span class="text-xs text-gray-500">${relevancePercent}% relevant</span>
+                            </div>
+                            <p class="text-xs text-gray-600 mt-1">${source.text_preview}</p>
+                            <div class="mt-2 flex space-x-2">
+                                <button onclick="openDocumentFile('${source.filename}')" 
+                                        class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">
+                                    📄 Open Document
+                                </button>
+                                <button onclick="openDocumentChunk(${source.rank - 1})" 
+                                        class="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600">
+                                    📝 View Chunk
+                                </button>
+                                <button onclick="openDocumentSummary('${source.filename}')" 
+                                        class="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600">
+                                    📋 Summary
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            sourcesHTML += '</div>';
+            sourcesDiv.innerHTML = sourcesHTML;
+            
+            // Add to chat messages
+            chatMessages.appendChild(sourcesDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
 
+        async function openDocumentFile(filename) {
+            try {
+                // Open the full PDF document in a new tab
+                const url = `/api/documents/file/${encodeURIComponent(filename)}`;
+                window.open(url, '_blank');
+            } catch (error) {
+                showNotification('Error opening document: ' + error.message, 'error');
+            }
+        }
+
+        async function openDocumentChunk(chunkIndex) {
+            try {
+                const response = await fetch(`/api/documents/${chunkIndex}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    showNotification('Error loading document chunk: ' + data.error, 'error');
+                    return;
+                }
+                
+                // Create a modal to display the document chunk content
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-lg p-6 max-w-4xl max-h-96 overflow-y-auto m-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">${data.metadata.filename || 'Document Chunk'}</h3>
+                            <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="prose max-w-none">
+                            <pre class="whitespace-pre-wrap text-sm">${data.content}</pre>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+            } catch (error) {
+                showNotification('Error loading document chunk: ' + error.message, 'error');
+            }
+        }
+
+        async function openDocumentSummary(filename) {
+            try {
+                showNotification('Generating document summary...', 'info');
+                
+                const response = await fetch(`/api/documents/summary/${encodeURIComponent(filename)}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    showNotification('Error generating summary: ' + data.error, 'error');
+                    return;
+                }
+                
+                // Create a modal to display the document summary
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-lg p-6 max-w-4xl max-h-96 overflow-y-auto m-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">📋 Document Summary: ${filename}</h3>
+                            <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="prose max-w-none">
+                            <div class="bg-gray-50 p-4 rounded-lg border-l-4 border-green-500">
+                                <pre class="whitespace-pre-wrap text-sm leading-relaxed">${data.summary}</pre>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+            } catch (error) {
+                showNotification('Error loading document summary: ' + error.message, 'error');
+            }
+        }
+
+        // Sidebar functionality
+        function toggleSidebar() {
+            sidebar.classList.toggle('collapsed');
+        }
+
+        // File management functions
+        async function loadDirectories() {
+            try {
+                const response = await fetch('/api/directories');
+                const data = await response.json();
+                directories = data.directories || {};
+                renderDirectoryTree();
+            } catch (error) {
+                console.error('Error loading directories:', error);
+            }
+        }
+
+        async function loadDocuments(directory = '') {
+            try {
+                const url = directory ? `/api/documents?directory=${encodeURIComponent(directory)}` : '/api/documents';
+                const response = await fetch(url);
+                const data = await response.json();
+                documents = data.documents || [];
+                renderDocuments();
+                updateFileCount();
+            } catch (error) {
+                console.error('Error loading documents:', error);
+            }
+        }
+
+        function renderDirectoryTree() {
+            const treeHtml = Object.values(directories).map(dir => `
+                <div class="directory-item p-2 hover:bg-gray-100 rounded cursor-pointer" onclick="selectDirectory('${dir.path}')">
+                    <i class="fas fa-folder text-blue-500 mr-2"></i>
+                    <span class="text-sm">${dir.name}</span>
+                </div>
+            `).join('');
+            
+            directoryTree.innerHTML = `
+                <div class="mb-2">
+                    <div class="directory-item p-2 hover:bg-gray-100 rounded cursor-pointer ${currentDirectory === '' ? 'bg-blue-100' : ''}" onclick="selectDirectory('')">
+                        <i class="fas fa-home text-gray-500 mr-2"></i>
+                        <span class="text-sm font-medium">Root</span>
+                    </div>
+                </div>
+                ${treeHtml}
+            `;
+        }
+
+        function renderDocuments() {
+            const documentsHtml = documents.map(doc => `
+                <div class="file-item p-2 hover:bg-gray-100 rounded cursor-pointer flex items-center justify-between ${selectedFile === doc.name ? 'selected' : ''}" 
+                     onclick="selectFile('${doc.name}')">
+                    <div class="flex items-center">
+                        <i class="fas fa-file-pdf text-red-500 mr-2"></i>
+                        <span class="text-sm truncate">${doc.name}</span>
+                    </div>
+                    <div class="flex space-x-1">
+                        <button onclick="viewDocument('${doc.name}')" class="p-1 text-blue-600 hover:bg-blue-100 rounded" title="View">
+                            <i class="fas fa-eye text-xs"></i>
+                        </button>
+                        <button onclick="deleteDocument('${doc.name}')" class="p-1 text-red-600 hover:bg-red-100 rounded" title="Delete">
+                            <i class="fas fa-trash text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+            
+            const documentsContainer = document.getElementById('documents-container') || document.createElement('div');
+            documentsContainer.id = 'documents-container';
+            documentsContainer.className = 'mt-4';
+            documentsContainer.innerHTML = `
+                <div class="text-sm font-medium text-gray-700 mb-2">Documents (${documents.length})</div>
+                ${documentsHtml || '<div class="text-gray-500 text-sm">No documents found</div>'}
+            `;
+            
+            if (!document.getElementById('documents-container')) {
+                directoryTree.appendChild(documentsContainer);
+            }
+        }
+
+        function selectDirectory(directory) {
+            currentDirectory = directory;
+            currentDirectorySpan.textContent = directory || 'Root';
+            loadDocuments(directory);
+            renderDirectoryTree();
+        }
+
+        function selectFile(filename) {
+            selectedFile = filename;
+            renderDocuments();
+        }
+
+        function updateFileCount() {
+            fileCount.textContent = `${documents.length} files`;
+        }
+
+        async function checkSystemStatus() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                if (data.status === 'ready') {
+                    const device = data.info.gpu_info && data.info.gpu_info.available ? 'GPU' : 'CPU';
+                    const gpuText = data.info.gpu_info && data.info.gpu_info.available ? 
+                        ` (${data.info.gpu_info.device_name})` : '';
+                    systemStatus.textContent = `System: Ready (${data.info.num_documents} docs, ${device}${gpuText})`;
+                    systemStatus.className = 'mt-1 text-green-600';
+                } else {
+                    systemStatus.textContent = `System: ${data.status}`;
+                    systemStatus.className = 'mt-1 text-red-600';
+                }
+            } catch (error) {
+                systemStatus.textContent = 'System: Error';
+                systemStatus.className = 'mt-1 text-red-600';
+            }
+        }
+
+        // Notification functions
+        function showNotification(message, type = 'info') {
+            notificationMessage.textContent = message;
+            
+            // Set icon and color based on type
+            const icon = notificationIcon.querySelector('i');
+            icon.className = 'fas ';
+            
+            switch (type) {
+                case 'success':
+                    icon.className += 'fa-check-circle text-green-500';
+                    notificationToast.querySelector('.border-l-4').className = 'bg-white rounded-lg shadow-lg border-l-4 border-green-500 p-4 max-w-sm';
+                    break;
+                case 'error':
+                    icon.className += 'fa-exclamation-circle text-red-500';
+                    notificationToast.querySelector('.border-l-4').className = 'bg-white rounded-lg shadow-lg border-l-4 border-red-500 p-4 max-w-sm';
+                    break;
+                case 'warning':
+                    icon.className += 'fa-exclamation-triangle text-yellow-500';
+                    notificationToast.querySelector('.border-l-4').className = 'bg-white rounded-lg shadow-lg border-l-4 border-yellow-500 p-4 max-w-sm';
+                    break;
+                default:
+                    icon.className += 'fa-info-circle text-blue-500';
+                    notificationToast.querySelector('.border-l-4').className = 'bg-white rounded-lg shadow-lg border-l-4 border-blue-500 p-4 max-w-sm';
+            }
+            
+            notificationToast.classList.remove('hidden');
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                hideNotification();
+            }, 5000);
+        }
+
+        function hideNotification() {
+            notificationToast.classList.add('hidden');
+        }
+
+        // Progress tracking functions
+        function showUploadProgress() {
+            uploadProgressSection.classList.remove('hidden');
+            uploadProgressBar.style.width = '0%';
+            uploadStatus.textContent = 'Preparing upload...';
+            uploadCount.textContent = '';
+            uploadSpeed.textContent = '';
+            uploadTime.textContent = '';
+        }
+
+        function hideUploadProgress() {
+            setTimeout(() => {
+                uploadProgressSection.classList.add('hidden');
+            }, 2000);
+        }
+
+        function updateUploadProgress(loaded, total, fileName) {
+            const percentage = Math.round((loaded / total) * 100);
+            uploadProgressBar.style.width = `${percentage}%`;
+            uploadStatus.textContent = `Uploading: ${fileName}`;
+            uploadCount.textContent = `${loaded}/${total} bytes`;
+            
+            if (uploadStartTime) {
+                const elapsed = (Date.now() - uploadStartTime) / 1000;
+                const speed = loaded / elapsed;
+                uploadSpeed.textContent = formatBytes(speed) + '/s';
+                uploadTime.textContent = `${elapsed.toFixed(1)}s`;
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function simulateProgress(totalFiles) {
+            let currentFile = 0;
+            let progress = 0;
+            let stage = 'uploading'; // 'uploading', 'processing', 'updating_rag'
+            
+            uploadProgressInterval = setInterval(() => {
+                if (stage === 'uploading' && currentFile < totalFiles) {
+                    const fileProgress = Math.min(progress, 100);
+                    const overallProgress = ((currentFile + fileProgress / 100) / totalFiles) * 70; // Upload takes 70% of progress
+                    uploadProgressBar.style.width = `${overallProgress}%`;
+                    uploadStatus.textContent = `Uploading file ${currentFile + 1} of ${totalFiles}...`;
+                    uploadCount.textContent = `${currentFile + 1}/${totalFiles} files`;
+                    
+                    progress += Math.random() * 20;
+                    if (progress >= 100) {
+                        progress = 0;
+                        currentFile++;
+                    }
+                } else if (stage === 'uploading' && currentFile >= totalFiles) {
+                    stage = 'processing';
+                    uploadStatus.textContent = 'Processing documents...';
+                    uploadCount.textContent = 'Extracting text and creating chunks...';
+                    uploadProgressBar.style.width = '80%';
+                } else if (stage === 'processing') {
+                    stage = 'updating_rag';
+                    uploadStatus.textContent = 'Updating RAG system...';
+                    uploadCount.textContent = 'Building search index...';
+                    uploadProgressBar.style.width = '90%';
+                } else if (stage === 'updating_rag') {
+                    clearInterval(uploadProgressInterval);
+                    uploadProgressBar.style.width = '100%';
+                    uploadStatus.textContent = 'Upload complete!';
+                    uploadCount.textContent = 'RAG system updated successfully';
+                }
+            }, 200);
+        }
+
+        // Drag and drop functionality
+        function setupDragAndDrop() {
+            // Show drop zone on drag over
+            document.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('hidden');
+                dropZone.classList.add('border-blue-400', 'bg-blue-50');
+            });
+
+            // Hide drop zone when drag leaves
+            document.addEventListener('dragleave', (e) => {
+                if (!dropZone.contains(e.relatedTarget)) {
+                    dropZone.classList.add('hidden');
+                    dropZone.classList.remove('border-blue-400', 'bg-blue-50');
+                }
+            });
+
+            // Handle file drop
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('hidden');
+                dropZone.classList.remove('border-blue-400', 'bg-blue-50');
+                
+                const files = Array.from(e.dataTransfer.files).filter(file => 
+                    file.type === 'application/pdf'
+                );
+                
+                if (files.length > 0) {
+                    // Create a fake event object for handleFileUpload
+                    const fakeEvent = {
+                        target: { files: files }
+                    };
+                    handleFileUpload(fakeEvent);
+                } else {
+                    showNotification('Please drop PDF files only', 'warning');
+                }
+            });
+
+            // Prevent default drag behaviors
+            document.addEventListener('dragover', (e) => e.preventDefault());
+            document.addEventListener('drop', (e) => e.preventDefault());
+        }
+
+        // File operations
+        async function uploadFiles() {
+            fileInput.click();
+        }
+
+        async function handleFileUpload(event) {
+            const files = event.target.files;
+            if (files.length === 0) return;
+
+            // Show progress UI
+            showUploadProgress();
+            uploadStartTime = Date.now();
+            
+            // Calculate total size
+            let totalSize = 0;
+            for (let file of files) {
+                totalSize += file.size;
+            }
+
+            const formData = new FormData();
+            for (let file of files) {
+                formData.append('files', file);
+            }
+            if (currentDirectory) {
+                formData.append('directory', currentDirectory);
+            }
+
+            // Start progress simulation
+            simulateProgress(files.length);
+
+            try {
+                // Create XMLHttpRequest for progress tracking
+                const xhr = new XMLHttpRequest();
+                
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        updateUploadProgress(e.loaded, e.total, 'Uploading...');
+                    }
+                });
+
+                xhr.addEventListener('load', () => {
+                    if (xhr.status === 200) {
+                        const data = JSON.parse(xhr.responseText);
+                        if (data.success) {
+                            uploadStatus.textContent = 'Processing documents...';
+                            uploadCount.textContent = `Processing ${data.files.length} files`;
+                            
+                            // Simulate processing time
+                            setTimeout(() => {
+                                uploadStatus.textContent = 'Upload complete!';
+                                uploadProgressBar.style.width = '100%';
+                                
+                                // Handle RAG system update feedback
+                                if (data.rag_update) {
+                                    if (data.rag_update.updated) {
+                                        showNotification(`Successfully uploaded ${data.files.length} files and updated RAG system with ${data.rag_update.documents_processed} document chunks!`, 'success');
+                                        addMessage(`Uploaded ${data.files.length} files successfully! RAG system updated with ${data.rag_update.documents_processed} document chunks.`, false);
+                                    } else if (data.rag_update.error) {
+                                        showNotification(`Files uploaded but RAG system update failed: ${data.rag_update.error}`, 'warning');
+                                        addMessage(`Uploaded ${data.files.length} files successfully, but RAG system update failed: ${data.rag_update.error}`, false);
+                                    } else {
+                                        showNotification(`Successfully uploaded ${data.files.length} files!`, 'success');
+                                        addMessage(`Uploaded ${data.files.length} files successfully!`, false);
+                                    }
+                                } else {
+                                    showNotification(`Successfully uploaded ${data.files.length} files!`, 'success');
+                                    addMessage(`Uploaded ${data.files.length} files successfully!`, false);
+                                }
+                                
+                                loadDocuments(currentDirectory);
+                                loadDirectories();
+                                checkSystemStatus(); // Update system status to reflect new document count
+                                hideUploadProgress();
+                            }, 1500);
+                        } else {
+                            uploadStatus.textContent = 'Upload failed!';
+                            showNotification(`Upload failed: ${data.message}`, 'error');
+                            addMessage(`Upload failed: ${data.message}`, false);
+                            hideUploadProgress();
+                        }
+                    } else {
+                        uploadStatus.textContent = 'Upload failed!';
+                        showNotification('Upload failed: Server error', 'error');
+                        addMessage('Upload failed: Server error', false);
+                        hideUploadProgress();
+                    }
+                });
+
+                xhr.addEventListener('error', () => {
+                    uploadStatus.textContent = 'Upload failed!';
+                    showNotification('Upload error: Network error', 'error');
+                    addMessage('Upload error: Network error', false);
+                    hideUploadProgress();
+                });
+
+                xhr.open('POST', '/upload');
+                xhr.send(formData);
+
+            } catch (error) {
+                uploadStatus.textContent = 'Upload failed!';
+                showNotification(`Upload error: ${error.message}`, 'error');
+                addMessage(`Upload error: ${error.message}`, false);
+                hideUploadProgress();
+            }
+        }
+
+        async function createNewFolder() {
+            const name = prompt('Enter folder name:');
+            if (!name) return;
+
+            try {
+                const response = await fetch('/api/directories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, parent: currentDirectory })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification(`Created folder "${name}" successfully!`, 'success');
+                    addMessage(`Created folder "${name}" successfully!`, false);
+                    loadDirectories();
+                } else {
+                    showNotification(`Failed to create folder: ${data.message}`, 'error');
+                    addMessage(`Failed to create folder: ${data.message}`, false);
+                }
+            } catch (error) {
+                showNotification(`Error creating folder: ${error.message}`, 'error');
+                addMessage(`Error creating folder: ${error.message}`, false);
+            }
+        }
+
+        async function viewDocument(filename) {
+            const url = currentDirectory ? 
+                `/api/documents/view?file=${encodeURIComponent(filename)}&directory=${encodeURIComponent(currentDirectory)}` :
+                `/api/documents/view?file=${encodeURIComponent(filename)}`;
+            window.open(url, '_blank');
+        }
+
+        async function deleteDocument(filename) {
+            if (!confirm(`Are you sure you want to delete "${filename}"?`)) return;
+
+            try {
+                const response = await fetch('/api/documents/delete', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: filename, directory: currentDirectory })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification(`Deleted "${filename}" successfully!`, 'success');
+                    addMessage(`Deleted "${filename}" successfully!`, false);
+                    loadDocuments(currentDirectory);
+                    loadDirectories();
+                } else {
+                    showNotification(`Failed to delete file: ${data.message}`, 'error');
+                    addMessage(`Failed to delete file: ${data.message}`, false);
+                }
+            } catch (error) {
+                showNotification(`Error deleting file: ${error.message}`, 'error');
+                addMessage(`Error deleting file: ${error.message}`, false);
+            }
+        }
+
+        async function refreshRAGSystem() {
+            if (!confirm('This will reload all documents into the RAG system. This may take a few moments. Continue?')) return;
+
+            // Show progress
+            showUploadProgress();
+            uploadStatus.textContent = 'Refreshing RAG system...';
+            uploadCount.textContent = 'Reloading all documents...';
+            uploadProgressBar.style.width = '50%';
+
+            try {
+                // Simulate progress
+                let progress = 50;
+                const progressInterval = setInterval(() => {
+                    progress += Math.random() * 10;
+                    if (progress < 90) {
+                        uploadProgressBar.style.width = `${progress}%`;
+                    }
+                }, 200);
+
+                // Make a request to refresh RAG system
+                const response = await fetch('/api/rag/refresh', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                clearInterval(progressInterval);
+                uploadProgressBar.style.width = '100%';
+                uploadStatus.textContent = 'RAG system refreshed!';
+                uploadCount.textContent = 'All documents reloaded';
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        showNotification(`RAG system refreshed successfully with ${data.documents_processed} document chunks!`, 'success');
+                        addMessage(`RAG system refreshed successfully with ${data.documents_processed} document chunks!`, false);
+                    } else {
+                        showNotification(`Failed to refresh RAG system: ${data.message}`, 'error');
+                        addMessage(`Failed to refresh RAG system: ${data.message}`, false);
+                    }
+                } else {
+                    showNotification('Failed to refresh RAG system', 'error');
+                    addMessage('Failed to refresh RAG system', false);
+                }
+
+                checkSystemStatus();
+                hideUploadProgress();
+
+            } catch (error) {
+                showNotification(`Error refreshing RAG system: ${error.message}`, 'error');
+                addMessage(`Error refreshing RAG system: ${error.message}`, false);
+                hideUploadProgress();
+            }
+        }
+
+        // LLM Provider functionality removed - using only local models
+        
+        // ChatGPT 5 Management
+        let currentModelType = 'local';
+        
+        async function toggleModel() {
+            const selectedModel = document.querySelector('input[name="model-type"]:checked').value;
+            
+            if (selectedModel === currentModelType) {
+                showNotification('Model is already selected', 'info');
+                return;
+            }
+            
+            // Check if API key is required
+            if (selectedModel === 'chatgpt5') {
+                const apiKey = document.getElementById('api-key-input').value.trim();
+                if (!apiKey) {
+                    showNotification('Please enter your OpenAI API key', 'error');
+                    return;
+                }
+            }
+            
+            try {
+                showNotification(`Switching to ${selectedModel === 'local' ? 'Local T5-Small' : 'ChatGPT 5'}...`, 'info');
+                
+                const apiKey = selectedModel === 'chatgpt5' ? document.getElementById('api-key-input').value.trim() : null;
+                
+                const response = await fetch('/api/chatgpt5/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        use_chatgpt5: selectedModel === 'chatgpt5',
+                        api_key: apiKey
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentModelType = selectedModel;
+                    updateModelStatus();
+                    showNotification(data.message, 'success');
+                    addMessage(`Model switched to ${selectedModel === 'local' ? 'Local T5-Small' : 'ChatGPT 5'}`, false);
+                } else {
+                    showNotification(`Failed to switch model: ${data.message}`, 'error');
+                    addMessage(`Failed to switch model: ${data.message}`, false);
+                }
+            } catch (error) {
+                showNotification(`Error switching model: ${error.message}`, 'error');
+                addMessage(`Error switching model: ${error.message}`, false);
+            }
+        }
+        
+        function updateModelStatus() {
+            const statusDiv = document.getElementById('model-status');
+            
+            if (currentModelType === 'local') {
+                statusDiv.innerHTML = `
+                    <p>Using Local T5-Small Model</p>
+                    <p class="text-green-600">✓ GPU Accelerated</p>
+                `;
+            } else {
+                statusDiv.innerHTML = `
+                    <p>Using ChatGPT 5 (External)</p>
+                    <p class="text-blue-600">✓ Web Automation</p>
+                `;
+            }
+        }
+
+        // Event listeners
+        sendBtn.addEventListener('click', sendMessage);
         userInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 sendMessage();
             }
         });
 
-        // Initial greeting
+        sidebarToggle.addEventListener('click', toggleSidebar);
+        uploadBtn.addEventListener('click', uploadFiles);
+        newFolderBtn.addEventListener('click', createNewFolder);
+        refreshRagBtn.addEventListener('click', refreshRAGSystem);
+        refreshBtn.addEventListener('click', () => {
+            loadDirectories();
+            loadDocuments(currentDirectory);
+            checkSystemStatus();
+        });
+        fileInput.addEventListener('change', handleFileUpload);
+
+        // LLM Provider event listeners removed - using only local models
+        
+        // API Key Validation
+        async function validateApiKey() {
+            const apiKey = document.getElementById('api-key-input').value.trim();
+            const statusDiv = document.getElementById('api-validation-status');
+            
+            if (!apiKey) {
+                showNotification('Please enter an API key first', 'error');
+                return;
+            }
+            
+            try {
+                showNotification('Validating API key...', 'info');
+                
+                const response = await fetch('/api/chatgpt5/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api_key: apiKey })
+                });
+                
+                const data = await response.json();
+                
+                statusDiv.classList.remove('hidden');
+                
+                if (data.success) {
+                    statusDiv.innerHTML = '<span class="text-green-600">✓ API key is valid</span>';
+                    showNotification('API key is valid!', 'success');
+                } else {
+                    statusDiv.innerHTML = `<span class="text-red-600">✗ ${data.message}</span>`;
+                    showNotification(`API key validation failed: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                statusDiv.classList.remove('hidden');
+                statusDiv.innerHTML = '<span class="text-red-600">✗ Validation error</span>';
+                showNotification(`Error validating API key: ${error.message}`, 'error');
+            }
+        }
+
+        // ChatGPT 5 event listeners
+        document.getElementById('toggle-model-btn').addEventListener('click', toggleModel);
+        document.getElementById('validate-api-btn').addEventListener('click', validateApiKey);
+        
+        // Show/hide API key section based on model selection
+        document.querySelectorAll('input[name="model-type"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const apiKeySection = document.getElementById('api-key-section');
+                const statusDiv = document.getElementById('api-validation-status');
+                if (this.value === 'chatgpt5') {
+                    apiKeySection.classList.remove('hidden');
+                } else {
+                    apiKeySection.classList.add('hidden');
+                    statusDiv.classList.add('hidden');
+                }
+            });
+        });
+
+        // Initialize
+        setupDragAndDrop();
+        loadDirectories();
+        loadDocuments();
+        checkSystemStatus();
         addMessage('Hello! This is a RAG-powered chatbot. Ask me anything!');
     </script>
 </body>
