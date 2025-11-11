@@ -3,6 +3,9 @@ import sys
 import os
 import logging
 import shutil
+import webbrowser
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from werkzeug.utils import secure_filename
@@ -10,6 +13,7 @@ from RAGSystem import RAGSystem, RAGConfig, setup_logging, check_gpu_availabilit
 
 # Initialize RAG system
 rag_system = None
+browser_opened = False
 
 def initialize_rag_system():
     """Initialize the RAG system with documents."""
@@ -20,9 +24,9 @@ def initialize_rag_system():
         
         # Initialize RAG system with configuration (device will be auto-detected)
         config = RAGConfig(
-            chunk_size=500,
+            chunk_size=1500,
             retrieval_k=2,
-            max_length=500
+            max_length=1500
             # device=None will trigger auto-detection
         )
         
@@ -68,7 +72,8 @@ def chat():
                     'rank': source.get('rank', 0),
                     'text_preview': source.get('text_preview', ''),
                     'download_url': f'/api/documents/{source.get("chunk_index", 0)}',
-                    'file_url': f'/api/documents/file/{source.get("filename", "unknown")}'
+                    'file_url': f'/api/documents/file/{source.get("filename", "unknown")}',
+                    'chunk': source.get('chunk', '')
                 })
             
             return jsonify({
@@ -256,6 +261,53 @@ def get_document_content(chunk_index):
         
     except Exception as e:
         logging.error(f"Error getting document content: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/documents/chunk/<filename>/<int:rank>', methods=['GET'])
+def get_document_chunk_by_filename_and_rank(filename, rank):
+    """Get document chunk content by filename and retrieval rank."""
+    global rag_system
+    
+    if rag_system is None:
+        return jsonify({'error': 'RAG system not initialized'}), 404
+    
+    try:
+        # Find all chunks that match the filename
+        matching_chunks = []
+        for i, metadata in enumerate(rag_system.retriever.document_metadata):
+            if (metadata.get('filename') == filename and 
+                i < len(rag_system.retriever.documents)):
+                chunk_info = {
+                    'index': i,
+                    'chunk': rag_system.retriever.documents[i],
+                    'metadata': metadata.copy()
+                }
+                matching_chunks.append(chunk_info)
+        
+        if not matching_chunks:
+            return jsonify({'error': f'No chunks found for filename "{filename}"'}), 404
+        
+        # If we have multiple chunks, we need to determine which one corresponds to the rank
+        # For now, let's return the first chunk and add rank information
+        if len(matching_chunks) == 1:
+            # Single chunk - return it
+            selected_chunk = matching_chunks[0]
+        else:
+            # Multiple chunks - for now, return the first one
+            # In a more sophisticated implementation, we could use the rank to select the right chunk
+            selected_chunk = matching_chunks[0]
+        
+        # Add rank information to metadata
+        selected_chunk['metadata']['rank'] = rank
+        selected_chunk['metadata']['relevance_score'] = 1.0 / rank  # Simple relevance score based on rank
+        
+        return jsonify({
+            'content': selected_chunk['chunk'],
+            'metadata': selected_chunk['metadata']
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting document chunk: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/documents/file/<filename>', methods=['GET'])
@@ -554,7 +606,17 @@ def validate_chatgpt5_api_key():
             'message': f'Validation error: {str(e)}'
         })
 
+def open_browser():
+    """Open the web browser after a short delay to allow the server to start."""
+    time.sleep(1.5)  # Wait for server to start
+    webbrowser.open('http://localhost:5000')
+
 if __name__ == '__main__':
+    # Clean up browser flag file from previous runs
+    browser_flag_file = Path("browser_opened.flag")
+    if browser_flag_file.exists():
+        browser_flag_file.unlink()
+    
     # Initialize RAG system
     if initialize_rag_system():
         print("RAG system initialized successfully")
@@ -565,6 +627,17 @@ if __name__ == '__main__':
         print(f"Test Query: {test_query}")
         print(f"Test Answer: {answer}")
         print(f"Sources: {len(sources)} documents found")
+        
+        # Start browser opening in a separate thread (only once)
+        if not browser_flag_file.exists():
+            # Create flag file immediately to prevent multiple threads
+            browser_flag_file.touch()
+            browser_thread = threading.Thread(target=open_browser)
+            browser_thread.daemon = True
+            browser_thread.start()
+        
+        print("Opening web interface at http://localhost:5000")
+        print("Press CTRL+C to stop the server")
         
         # Start Flask app
         app.run(debug=True, host='0.0.0.0', port=5000)

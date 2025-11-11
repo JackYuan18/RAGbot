@@ -246,9 +246,12 @@ class DocumentRetriever:
                     metadata = self.document_metadata[idx].copy() if idx < len(self.document_metadata) else {'filename': f'Document {idx+1}'}
                     metadata['relevance_score'] = float(1.0 / (1.0 + distance))  # Convert distance to similarity score
                     metadata['rank'] = i + 1
+                    metadata['chunk'] = self.documents[idx]
                     retrieved_metadata.append(metadata)
+                    self.logger.info(f"Retrieved chunk: {self.documents[idx]}")
             
             self.logger.info(f"Retrieved {len(retrieved_docs)} documents for query")
+            
             return retrieved_docs, retrieved_metadata
             
         except Exception as e:
@@ -544,9 +547,9 @@ def main():
         
         # Initialize RAG system
         config = RAGConfig(
-            chunk_size=500,
+            chunk_size=1500,
             retrieval_k=2,
-            max_length=500
+            max_length=1500
         )
         
         rag_system = RAGSystem(config)
