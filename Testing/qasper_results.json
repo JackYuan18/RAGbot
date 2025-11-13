@@ -1,0 +1,42 @@
+[
+  {
+    "article_id": "1912.01214",
+    "title": "Cross-lingual Pre-training Based Transfer for Zero-shot Neural Machine Translation",
+    "question": "which multilingual approaches do they compare with?",
+    "generated_answer": "TABREF18 :: Setup We evaluate our cross-lingual pre-training based transfer approach against several strong baselines on two public datatsets, Europarl BIBREF31 and MultiUN BIBREF32 . we use four languages: English (En) is set as the pivot language, which has parallel data with other three languages which do not have parallel data between each other .\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "BIBREF19",
+      "BIBREF20",
+      "multilingual NMT (MNMT) BIBREF19"
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small"
+  },
+  {
+    "article_id": "1912.01214",
+    "title": "Cross-lingual Pre-training Based Transfer for Zero-shot Neural Machine Translation",
+    "question": "what are the pivot-based baselines?",
+    "generated_answer": ":: Main Results ::: Results on Europarl Dataset. What are the pivot-based baselines? Context: Experiments::: Main Results ::: Results on Europarl Dataset. What are the pivot-based baselines? Context: Experiments::: Main Results ::: Results on Europarl Dataset. What are the pivot-based baselines?\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "pivoting",
+      "pivoting$_{\\rm m}$",
+      "firstly translates a source language into the pivot language which is later translated to the target language"
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small"
+  },
+  {
+    "article_id": "1912.01214",
+    "title": "Cross-lingual Pre-training Based Transfer for Zero-shot Neural Machine Translation",
+    "question": "which datasets did they experiment with?",
+    "generated_answer": ":: Main Results ::: Results on Europarl Dataset. We evaluate on French-English-Spanish (Fr-En-Es), German-English-French (De-En-Fr) and Romanian-English-German (Ro-En-De) where English acts as the pivot language, its left side is the source language, and its right side is the target language . We remove the multi-parallel sentences between different training corpora to ensure zero-shot settings\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "Europarl",
+      "MultiUN",
+      "Europarl BIBREF31",
+      "MultiUN BIBREF32"
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small"
+  }
+]

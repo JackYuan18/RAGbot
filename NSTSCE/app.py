@@ -9,6 +9,22 @@ import time
 from datetime import datetime
 from pathlib import Path
 from werkzeug.utils import secure_filename
+
+CURRENT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = CURRENT_DIR.parent
+DATABASE_DIR = CURRENT_DIR / "Database"
+
+# Ensure the RAGSystem module is importable regardless of project layout.
+for candidate in (
+    PROJECT_ROOT / "RAGSystem.py",
+    PROJECT_ROOT / "RAG system" / "RAGSystem.py",
+    CURRENT_DIR / "RAGSystem.py",
+):
+    if candidate.exists():
+        module_dir = str(candidate.parent)
+        if module_dir not in sys.path:
+            sys.path.insert(0, module_dir)
+
 from RAGSystem import RAGSystem, RAGConfig, setup_logging, check_gpu_availability
 
 # Initialize RAG system
@@ -32,10 +48,8 @@ def initialize_rag_system():
         
         rag_system = RAGSystem(config)
         
-        # Load documents from Database directory
-        cwd = os.getcwd()
-        pdf_directory = os.path.join(cwd, "Database")
-        rag_system.load_documents(pdf_directory)
+        # Load documents from Database directory relative to this file
+        rag_system.load_documents(str(DATABASE_DIR))
         
         logging.info("RAG system initialized successfully")
         return True
@@ -122,7 +136,7 @@ def upload_files():
         directory = request.form.get('directory', '')
         
         # Create directory path
-        base_dir = Path('Database')
+        base_dir = DATABASE_DIR
         if directory:
             target_dir = base_dir / directory
         else:
@@ -167,7 +181,7 @@ def upload_files():
 def get_directories():
     """Get list of directories."""
     try:
-        base_dir = Path('Database')
+        base_dir = DATABASE_DIR
         directories = {}
         
         if base_dir.exists():
@@ -195,7 +209,7 @@ def create_directory():
         if not name:
             return jsonify({'success': False, 'message': 'Directory name is required'})
         
-        base_dir = Path('Database')
+        base_dir = DATABASE_DIR
         if parent:
             target_dir = base_dir / parent / name
         else:
@@ -215,7 +229,7 @@ def get_documents():
     """Get list of documents in a directory."""
     try:
         directory = request.args.get('directory', '')
-        base_dir = Path('Database')
+        base_dir = DATABASE_DIR
         
         if directory:
             target_dir = base_dir / directory
@@ -379,7 +393,7 @@ def rename_document():
         if not old_name or not new_name:
             return jsonify({'success': False, 'message': 'Old name and new name are required'})
         
-        base_dir = Path('Database')
+        base_dir = DATABASE_DIR
         if directory:
             target_dir = base_dir / directory
         else:
@@ -414,7 +428,7 @@ def move_document():
         if not filename:
             return jsonify({'success': False, 'message': 'Filename is required'})
         
-        base_dir = Path('Database')
+        base_dir = DATABASE_DIR
         
         # Source path
         if from_directory:
@@ -458,7 +472,7 @@ def delete_document():
         if not filename:
             return jsonify({'success': False, 'message': 'Filename is required'})
         
-        base_dir = Path('Database')
+        base_dir = DATABASE_DIR
         if directory:
             target_dir = base_dir / directory
         else:
