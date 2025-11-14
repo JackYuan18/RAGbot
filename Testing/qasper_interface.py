@@ -16,7 +16,7 @@ import sys
 import threading
 import webbrowser
 from pathlib import Path
-from typing import Any, List
+from typing import Any, Dict, List
 
 from flask import Flask, jsonify, render_template_string, request  # type: ignore
 
@@ -39,12 +39,20 @@ TEST_OPTIONS: argparse.Namespace
 
 
 def run_test_script(options: argparse.Namespace) -> subprocess.CompletedProcess[str]:
+    """Run test script for a single dataset."""
     if not DEFAULT_TEST_SCRIPT.exists():
         raise FileNotFoundError(f"Cannot locate test script at {DEFAULT_TEST_SCRIPT}")
 
+    dataset = getattr(options, "dataset", "qasper")
+    # Ensure RESULTS_PATH is absolute
+    results_path_abs = RESULTS_PATH.resolve()
+    results_path_abs.parent.mkdir(parents=True, exist_ok=True)
+    
     cmd = [
         sys.executable,
         str(DEFAULT_TEST_SCRIPT),
+        "--dataset",
+        dataset,
         "--split",
         options.split,
         "--articles",
@@ -60,13 +68,13 @@ def run_test_script(options: argparse.Namespace) -> subprocess.CompletedProcess[
         "--log-level",
         options.log_level,
         "--save-json",
-        str(RESULTS_PATH),
+        str(results_path_abs),
     ]
 
     if getattr(options, "chatgpt5_api_key", None):
         cmd.extend(["--chatgpt5-api-key", options.chatgpt5_api_key])
 
-    if getattr(options, "show_context", True):
+    if getattr(options, "show_context", False):
         cmd.append("--show-context")
     else:
         cmd.append("--hide-context")
@@ -81,54 +89,268 @@ def run_test_script(options: argparse.Namespace) -> subprocess.CompletedProcess[
             pass
 
     app.logger.info("Running test script: %s", " ".join(display_cmd))
-    return subprocess.run(cmd, check=False, capture_output=True, text=True)
+    app.logger.info("Results will be saved to: %s (absolute: %s)", RESULTS_PATH, results_path_abs)
+    app.logger.info("Working directory: %s", CURRENT_DIR)
+    app.logger.info("Python executable: %s", sys.executable)
+    app.logger.info("Test script path: %s (exists: %s)", DEFAULT_TEST_SCRIPT, DEFAULT_TEST_SCRIPT.exists())
+    
+    try:
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True, cwd=str(CURRENT_DIR), timeout=3600)
+    except subprocess.TimeoutExpired:
+        app.logger.error("Test script timed out after 1 hour")
+        return subprocess.CompletedProcess(cmd, 1, "", "Test script timed out")
+    except Exception as exc:
+        app.logger.error("Failed to run test script: %s", exc)
+        return subprocess.CompletedProcess(cmd, 1, "", str(exc))
+    
+    if result.returncode != 0:
+        app.logger.error("Test script failed with return code %d", result.returncode)
+        app.logger.error("STDOUT: %s", result.stdout[-1000:] if result.stdout else "(empty)")
+        app.logger.error("STDERR: %s", result.stderr[-1000:] if result.stderr else "(empty)")
+    else:
+        app.logger.info("Test script completed successfully")
+        if results_path_abs.exists():
+            app.logger.info("Results file exists at: %s", results_path_abs)
+            try:
+                with results_path_abs.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    app.logger.info("Results file contains %d entries", len(data) if isinstance(data, list) else 0)
+            except Exception as e:
+                app.logger.error("Failed to read results file: %s", e)
+        else:
+            app.logger.warning("Results file not found at: %s", results_path_abs)
+    return result
+
+
+def run_multiple_datasets(options: argparse.Namespace, datasets: List[str]) -> subprocess.CompletedProcess[str]:
+    """Run test script for multiple datasets sequentially and combine results."""
+    if not DEFAULT_TEST_SCRIPT.exists():
+        raise FileNotFoundError(f"Cannot locate test script at {DEFAULT_TEST_SCRIPT}")
+
+    all_results: List[Dict[str, Any]] = []
+    combined_output = []
+    combined_error = []
+    last_returncode = 0
+
+    # Ensure RESULTS_PATH is absolute
+    results_path_abs = RESULTS_PATH.resolve()
+    results_path_abs.parent.mkdir(parents=True, exist_ok=True)
+
+    # Clear results file at the start
+    clear_results_file()
+
+    for idx, dataset in enumerate(datasets):
+        app.logger.info("Running tests for dataset %d/%d: %s", idx + 1, len(datasets), dataset)
+        RUN_STATE["message"] = f"Running tests for dataset {idx + 1}/{len(datasets)}: {dataset}..."
+        
+        # Create options for this dataset
+        dataset_options = argparse.Namespace(**vars(options))
+        dataset_options.dataset = dataset
+        
+        # Run test for this dataset (this will write to RESULTS_PATH)
+        result = run_test_script(dataset_options)
+        
+        # Collect output
+        if result.stdout:
+            combined_output.append(f"\n=== Dataset: {dataset} ===\n")
+            combined_output.append(result.stdout)
+        if result.stderr:
+            combined_error.append(f"\n=== Dataset: {dataset} ===\n")
+            combined_error.append(result.stderr)
+        
+        # Update last returncode (keep error if any dataset fails)
+        if result.returncode != 0:
+            last_returncode = result.returncode
+        
+        # Load results from this dataset run and add to combined results
+        try:
+            if results_path_abs.exists():
+                with results_path_abs.open("r", encoding="utf-8") as f:
+                    dataset_results = json.load(f)
+                    if isinstance(dataset_results, list):
+                        all_results.extend(dataset_results)
+                        app.logger.info("Loaded %d results from dataset %s (total: %d)", len(dataset_results), dataset, len(all_results))
+                    else:
+                        app.logger.warning("Results file for dataset %s does not contain a list", dataset)
+            else:
+                app.logger.warning("Results file not found after dataset %s run: %s", dataset, results_path_abs)
+        except Exception as exc:
+            app.logger.error("Failed to load results for dataset %s: %s", dataset, exc)
+    
+    # Save combined results
+    try:
+        results_path_abs.parent.mkdir(parents=True, exist_ok=True)
+        with results_path_abs.open("w", encoding="utf-8") as f:
+            json.dump(all_results, f, ensure_ascii=False, indent=2)
+        app.logger.info("Combined %d results from %d datasets into %s", len(all_results), len(datasets), results_path_abs)
+        if not all_results:
+            app.logger.warning("No results collected from any dataset!")
+    except Exception as exc:
+        app.logger.error("Failed to save combined results to %s: %s", results_path_abs, exc)
+        raise
+    
+    # Return combined result
+    return subprocess.CompletedProcess(
+        args=[],
+        returncode=last_returncode,
+        stdout="".join(combined_output),
+        stderr="".join(combined_error),
+    )
 
 
 def start_test_run(options: argparse.Namespace, *, async_run: bool = True) -> bool:
     if not RUN_LOCK.acquire(blocking=False):
+        app.logger.warning("Cannot start test run: another run is already in progress")
         return False
 
     RUN_STATE["status"] = "running"
     RUN_STATE["message"] = "Test run in progress..."
     RUN_STATE["last_result"] = None
+    app.logger.info("Starting test run with options: dataset=%s, split=%s, articles=%s, questions_per_article=%s",
+                   getattr(options, "dataset", "unknown"), getattr(options, "split", "unknown"),
+                   getattr(options, "articles", "unknown"), getattr(options, "questions_per_article", "unknown"))
 
     def runner() -> None:
         try:
-            result = run_test_script(options)
+            app.logger.info("Test runner thread started")
+            # Check if multiple datasets are requested
+            datasets = getattr(options, "datasets", None)
+            app.logger.info("Datasets attribute: %s (type: %s)", datasets, type(datasets))
+            if datasets and isinstance(datasets, list) and len(datasets) > 1:
+                app.logger.info("Running multiple datasets: %s", datasets)
+                result = run_multiple_datasets(options, datasets)
+            else:
+                dataset = getattr(options, "dataset", "qasper")
+                app.logger.info("Running single dataset: %s", dataset)
+                result = run_test_script(options)
+            
+            app.logger.info("Test script finished with return code: %d", result.returncode)
             if result.returncode == 0:
-                RUN_STATE["message"] = "Last run completed successfully."
+                dataset_count = len(datasets) if datasets and isinstance(datasets, list) else 1
+                RUN_STATE["message"] = f"Last run completed successfully ({dataset_count} dataset(s))."
                 RUN_STATE["last_result"] = "success"
                 app.logger.info("test_qasper_rag.py completed successfully.")
+                # Verify results file was created
+                results_path_abs = RESULTS_PATH.resolve()
+                if results_path_abs.exists():
+                    try:
+                        with results_path_abs.open("r", encoding="utf-8") as f:
+                            data = json.load(f)
+                            count = len(data) if isinstance(data, list) else 0
+                            app.logger.info("Results file verified: %d entries", count)
+                    except Exception as e:
+                        app.logger.error("Failed to verify results file: %s", e)
+                else:
+                    app.logger.warning("Results file missing after successful run: %s", results_path_abs)
             else:
-                RUN_STATE["message"] = f"Run failed with code {result.returncode}."
+                error_msg = f"Run failed with code {result.returncode}."
+                if result.stderr:
+                    error_msg += f" Error: {result.stderr[:200]}"
+                RUN_STATE["message"] = error_msg
                 RUN_STATE["last_result"] = "error"
-                app.logger.error("test_qasper_rag.py failed (%s):\n%s", result.returncode, result.stderr)
+                app.logger.error("test_qasper_rag.py failed (%s):\nSTDOUT:\n%s\nSTDERR:\n%s", 
+                               result.returncode, result.stdout[-500:] if result.stdout else "(empty)", 
+                               result.stderr[-500:] if result.stderr else "(empty)")
         except Exception as exc:  # pragma: no cover - defensive logging
-            RUN_STATE["message"] = f"Error: {exc}"
+            error_msg = f"Error: {str(exc)}"
+            RUN_STATE["message"] = error_msg
             RUN_STATE["last_result"] = "error"
-            app.logger.exception("Unexpected error during test run")
+            app.logger.exception("Unexpected error during test run: %s", exc)
         finally:
             RUN_STATE["status"] = "idle"
             RUN_LOCK.release()
+            app.logger.info("Test runner thread finished")
 
     if async_run:
-        threading.Thread(target=runner, daemon=True).start()
+        thread = threading.Thread(target=runner, daemon=True)
+        thread.start()
+        app.logger.info("Test runner thread started (daemon=%s)", thread.daemon)
     else:
+        app.logger.info("Running test synchronously")
         runner()
 
     return True
 
 
 def load_results() -> List[dict[str, Any]]:
-    if RESULTS_PATH.exists():
+    results_path_abs = RESULTS_PATH.resolve()
+    if results_path_abs.exists():
         try:
-            with RESULTS_PATH.open("r", encoding="utf-8") as fh:
+            with results_path_abs.open("r", encoding="utf-8") as fh:
                 data = json.load(fh)
                 if isinstance(data, list):
+                    app.logger.debug("Loaded %d results from %s", len(data), results_path_abs)
                     return data
+                else:
+                    app.logger.warning("Results file does not contain a list: %s", results_path_abs)
         except Exception as exc:  # pragma: no cover - defensive logging
-            app.logger.error("Failed to read %s: %s", RESULTS_PATH, exc)
+            app.logger.error("Failed to read %s: %s", results_path_abs, exc)
+    else:
+        app.logger.debug("Results file does not exist: %s", results_path_abs)
     return []
+
+
+def calculate_dataset_statistics(results: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """
+    Calculate statistics (average, min, max) for each dataset.
+    
+    Returns a dictionary mapping dataset name to statistics dict.
+    """
+    from collections import defaultdict
+    
+    # Group results by dataset
+    by_dataset: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for result in results:
+        dataset = result.get("dataset", "unknown")
+        by_dataset[dataset].append(result)
+    
+    statistics: Dict[str, Dict[str, Any]] = {}
+    
+    for dataset, dataset_results in by_dataset.items():
+        metrics = {
+            "exact_match": [],
+            "f1_score": [],
+            "rouge_l_score": [],
+            "bleu_score": [],
+        }
+        
+        # Collect all scores
+        for result in dataset_results:
+            for metric_name in metrics.keys():
+                score = result.get(metric_name)
+                if score is not None:
+                    try:
+                        score_float = float(score)
+                        if not (score_float is None or (isinstance(score_float, float) and score_float != score_float)):  # Check for NaN
+                            metrics[metric_name].append(score_float)
+                    except (TypeError, ValueError):
+                        pass
+        
+        # Calculate statistics for each metric
+        stats: Dict[str, Any] = {
+            "count": len(dataset_results),
+            "metrics": {}
+        }
+        
+        for metric_name, scores in metrics.items():
+            if scores:
+                stats["metrics"][metric_name] = {
+                    "average": sum(scores) / len(scores),
+                    "min": min(scores),
+                    "max": max(scores),
+                    "count": len(scores),
+                }
+            else:
+                stats["metrics"][metric_name] = {
+                    "average": None,
+                    "min": None,
+                    "max": None,
+                    "count": 0,
+                }
+        
+        statistics[dataset] = stats
+    
+    return statistics
 
 
 def clear_results_file() -> None:
@@ -176,6 +398,34 @@ TEMPLATE = """
     .api-key-status { font-size: 0.9rem; color: #495057; }
     .api-key-status.valid { color: #198754; }
     .api-key-status.invalid { color: #dc3545; }
+    .dataset-tab { margin-bottom: 1.5rem; background: #ffffff; border: 1px solid #dee2e6; border-radius: 0.5rem; box-shadow: 0 0 6px rgba(0,0,0,0.05); }
+    .tab-header { padding: 1rem 1.25rem; background: #e9ecef; border-bottom: 1px solid #dee2e6; cursor: pointer; user-select: none; border-radius: 0.5rem 0.5rem 0 0; }
+    .tab-header:hover { background: #dee2e6; }
+    .tab-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+    .tab-title { font-weight: 600; font-size: 1.1rem; color: #212529; }
+    .tab-toggle { font-size: 1.2rem; color: #495057; transition: transform 0.2s ease; }
+    .tab-header.collapsed .tab-toggle { transform: rotate(-90deg); }
+    .tab-stats { display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.9rem; }
+    .tab-stat-item { display: flex; align-items: center; gap: 0.4rem; }
+    .tab-stat-label { color: #495057; font-weight: 500; }
+    .tab-stat-value { color: #212529; font-weight: 600; }
+    .tab-content { padding: 0; display: none; }
+    .tab-content.expanded { display: block; }
+    .tab-results-table { width: 100%; border-collapse: collapse; background: #fff; }
+    .tab-results-table th, .tab-results-table td { padding: 0.85rem; border-bottom: 1px solid #dee2e6; vertical-align: top; }
+    .tab-results-table th { background: #f8f9fa; text-align: left; font-weight: 600; }
+    .tab-results-table tbody tr:nth-child(even) { background: #fefefe; }
+    .tab-empty-state { padding: 2rem; text-align: center; color: #6c757d; }
+    .summary-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    .summary-table th, .summary-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6; }
+    .summary-table th { background: #f8f9fa; font-weight: 600; color: #495057; }
+    .summary-table td { color: #212529; }
+    .summary-table tr:last-child td { border-bottom: none; }
+    .metric-value { font-weight: 500; }
+    .metric-value.avg { color: #0d6efd; }
+    .metric-value.min { color: #dc3545; }
+    .metric-value.max { color: #198754; }
+    .metric-na { color: #6c757d; font-style: italic; }
   </style>
 </head>
 <body>
@@ -190,11 +440,41 @@ TEMPLATE = """
       &nbsp;|&nbsp; <strong>Articles:</strong> <code id="config-articles" class="config-value">{{ config.articles }}</code>
       &nbsp;|&nbsp; <strong>Questions/article:</strong> <code id="config-questions_per_article" class="config-value">{{ config.questions_per_article }}</code>
       &nbsp;|&nbsp; <strong>Split:</strong> <code id="config-split" class="config-value">{{ config.split }}</code>
+      &nbsp;|&nbsp; <strong>Datasets:</strong> <code id="config-dataset" class="config-value">{{ config.datasets or config.dataset }}</code>
       &nbsp;|&nbsp; <strong>Show context:</strong> <code id="config-show_context" class="config-value">{{ 'Yes' if config.show_context else 'No' }}</code>
     </p>
     <p>Total questions processed: <strong id="total-questions">0</strong></p>
   </div>
   <div class="config-form" id="config-form">
+    <label style="display: flex; flex-direction: column; gap: 0.5rem;">
+      <span style="font-size: 0.95rem; color: #495057; font-weight: 500;">Datasets</span>
+      <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+        <label style="flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer;">
+          <input type="checkbox" id="input-dataset-qasper" name="datasets" value="qasper" class="dataset-checkbox" {% if config.dataset == 'qasper' or (config.datasets and 'qasper' in config.datasets) %}checked{% endif %}>
+          <span>QASPER</span>
+        </label>
+        <label style="flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer;">
+          <input type="checkbox" id="input-dataset-qmsum" name="datasets" value="qmsum" class="dataset-checkbox" {% if config.dataset == 'qmsum' or (config.datasets and 'qmsum' in config.datasets) %}checked{% endif %}>
+          <span>QMSum</span>
+        </label>
+        <label style="flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer;">
+          <input type="checkbox" id="input-dataset-narrativeqa" name="datasets" value="narrativeqa" class="dataset-checkbox" {% if config.dataset == 'narrativeqa' or (config.datasets and 'narrativeqa' in config.datasets) %}checked{% endif %}>
+          <span>NarrativeQA</span>
+        </label>
+        <label style="flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer;">
+          <input type="checkbox" id="input-dataset-quality" name="datasets" value="quality" class="dataset-checkbox" {% if config.dataset == 'quality' or (config.datasets and 'quality' in config.datasets) %}checked{% endif %}>
+          <span>QuALITY</span>
+        </label>
+        <label style="flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer;">
+          <input type="checkbox" id="input-dataset-hotpot" name="datasets" value="hotpot" class="dataset-checkbox" {% if config.dataset == 'hotpot' or (config.datasets and 'hotpot' in config.datasets) %}checked{% endif %}>
+          <span>HotpotQA</span>
+        </label>
+        <label style="flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer;">
+          <input type="checkbox" id="input-dataset-musique" name="datasets" value="musique" class="dataset-checkbox" {% if config.dataset == 'musique' or (config.datasets and 'musique' in config.datasets) %}checked{% endif %}>
+          <span>MuSiQue</span>
+        </label>
+      </div>
+    </label>
     <label for="input-generator_model">
       Generator
       <select id="input-generator_model" name="generator_model" class="param-input" data-default="{{ config.generator_model }}" data-type="string" data-target="config-generator">
@@ -232,30 +512,19 @@ TEMPLATE = """
     </label>
   </div>
   <div class="actions">
-    <button id="run-tests" {% if run_state.status == 'running' %}disabled{% endif %}>Run Tests</button>
+    <button id="run-tests" type="button" {% if run_state.status == 'running' %}disabled{% endif %}>Run Tests</button>
     <span id="run-status" data-status="{{ run_state.status }}" data-last-result="{{ run_state.last_result or '' }}">{{ run_state.message }}</span>
   </div>
-  <div id="results-container">
-    <p id="empty-state">No results yet. Click <strong>Run Tests</strong> to begin.</p>
-    <table id="results-table" hidden>
-    <thead>
-      <tr>
-        <th style="width: 15%">Article</th>
-        <th style="width: 25%">Question</th>
-        <th style="width: 25%">Generated Answer</th>
-        <th style="width: 20%">Reference Answers</th>
-        <th style="width: 15%">Score</th>
-      </tr>
-    </thead>
-      <tbody id="results-body"></tbody>
-    </table>
+  <div id="dataset-tabs-container"></div>
+  <div id="empty-state-container" style="text-align: center; padding: 2rem; color: #6c757d;">
+    <p>No results yet. Click <strong>Run Tests</strong> to begin.</p>
   </div>
   <script>
+    console.log('JavaScript script loading...');
     const runButton = document.getElementById('run-tests');
     const runStatus = document.getElementById('run-status');
-    const resultsTable = document.getElementById('results-table');
-    const resultsBody = document.getElementById('results-body');
-    const emptyState = document.getElementById('empty-state');
+    const datasetTabsContainer = document.getElementById('dataset-tabs-container');
+    const emptyStateContainer = document.getElementById('empty-state-container');
     const totalQuestions = document.getElementById('total-questions');
     const generatorSelect = document.getElementById('input-generator_model');
     const apiKeyField = document.getElementById('chatgpt5-key-field');
@@ -263,7 +532,44 @@ TEMPLATE = """
     const validateButton = document.getElementById('validate-api-key');
     const apiKeyStatus = document.getElementById('api-key-status');
     const paramInputs = Array.from(document.querySelectorAll('.param-input'));
+    const datasetCheckboxes = Array.from(document.querySelectorAll('.dataset-checkbox'));
     let renderedCount = 0;
+    
+    console.log('Button element:', runButton);
+    console.log('Button exists:', !!runButton);
+    if (runButton) {
+      console.log('Button type:', runButton.type);
+      console.log('Button disabled:', runButton.disabled);
+    }
+
+    function updateDatasetDisplay() {
+      const checked = Array.from(datasetCheckboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+      const target = document.getElementById('config-dataset');
+      if (target) {
+        const displayText = checked.map(d => {
+          if (d === 'qasper') return 'QASPER';
+          if (d === 'qmsum') return 'QMSum';
+          if (d === 'narrativeqa') return 'NarrativeQA';
+          if (d === 'quality') return 'QuALITY';
+          if (d === 'hotpot') return 'HotpotQA';
+          if (d === 'musique') return 'MuSiQue';
+          return d;
+        }).join(', ') || 'None';
+        target.textContent = displayText;
+        const defaultDatasets = Array.from(datasetCheckboxes)
+          .filter(cb => cb.hasAttribute('checked'))
+          .map(cb => cb.value);
+        const isModified = JSON.stringify(checked.sort()) !== JSON.stringify(defaultDatasets.sort());
+        target.classList.toggle('modified', isModified);
+      }
+    }
+
+    datasetCheckboxes.forEach((checkbox) => {
+      checkbox.addEventListener('change', updateDatasetDisplay);
+    });
+    updateDatasetDisplay();
 
     function applyInputAppearance(input) {
       const defaultValue = input.dataset.default ?? '';
@@ -287,6 +593,34 @@ TEMPLATE = """
           }
         } else if (targetId === 'config-show_context') {
           displayValue = displayValue === 'true' ? 'Yes' : 'No';
+        } else if (targetId === 'config-dataset') {
+          // Display selected datasets
+            if (Array.isArray(displayValue)) {
+            displayValue = displayValue.map(d => {
+              if (d === 'qasper') return 'QASPER';
+              if (d === 'qmsum') return 'QMSum';
+              if (d === 'narrativeqa') return 'NarrativeQA';
+              if (d === 'quality') return 'QuALITY';
+              if (d === 'hotpot') return 'HotpotQA';
+              if (d === 'musique') return 'MuSiQue';
+              return d;
+            }).join(', ');
+          } else {
+            // Fallback for single dataset
+            if (displayValue === 'qasper') {
+              displayValue = 'QASPER';
+            } else if (displayValue === 'qmsum') {
+              displayValue = 'QMSum';
+            } else if (displayValue === 'narrativeqa') {
+              displayValue = 'NarrativeQA';
+            } else if (displayValue === 'quality') {
+              displayValue = 'QuALITY';
+            } else if (displayValue === 'hotpot') {
+              displayValue = 'HotpotQA';
+            } else if (displayValue === 'musique') {
+              displayValue = 'MuSiQue';
+            }
+          }
         }
         target.textContent = displayValue;
         target.classList.toggle('modified', isModified);
@@ -393,7 +727,25 @@ TEMPLATE = """
         .catch((err) => console.error('Status poll failed', err));
     }
 
-    function appendResultRow(item) {
+
+    function formatMetricValue(value) {
+      if (value === null || value === undefined || isNaN(value)) {
+        return 'N/A';
+      }
+      return value.toFixed(4);
+    }
+
+    function formatMetricShort(value) {
+      if (value === null || value === undefined || isNaN(value)) {
+        return 'N/A';
+      }
+      return value.toFixed(3);
+    }
+
+    let renderedResultsByDataset = {};
+    const tabExpandedState = {}; // Track expanded/collapsed state for each dataset
+
+    function appendResultRowToTable(tbody, item) {
       const row = document.createElement('tr');
       const articleCell = document.createElement('td');
       articleCell.innerHTML = '<div class="badge">ID: ' + (item.article_id || 'N/A') + '</div><div>' + (item.title || 'Unknown title') + '</div>';
@@ -444,131 +796,197 @@ TEMPLATE = """
         placeholder.textContent = 'No reference answers provided.';
         refCell.appendChild(placeholder);
       }
-
       const scoreCell = document.createElement('td');
-      scoreCell.style.verticalAlign = 'top';
-      scoreCell.style.fontSize = '0.9rem';
-      
-      const scoreContainer = document.createElement('div');
-      scoreContainer.style.display = 'flex';
-      scoreContainer.style.flexDirection = 'column';
-      scoreContainer.style.gap = '0.5rem';
-      
-      let hasAnyScore = false;
-      
-      // Display Exact Match score
+      const scoreParts = [];
       if (item.exact_match !== null && item.exact_match !== undefined) {
-        const emValue = parseFloat(item.exact_match);
-        if (!isNaN(emValue)) {
-          hasAnyScore = true;
-          const emDiv = document.createElement('div');
-          const emLabel = document.createElement('span');
-          emLabel.textContent = 'EM: ';
-          emLabel.style.fontWeight = '600';
-          emLabel.style.color = '#495057';
-          const emScore = document.createElement('span');
-          emScore.textContent = emValue.toFixed(4);
-          emScore.style.fontWeight = '600';
-          emScore.style.color = emValue >= 1.0 ? '#198754' : '#dc3545';
-          emDiv.appendChild(emLabel);
-          emDiv.appendChild(emScore);
-          scoreContainer.appendChild(emDiv);
-        }
+        scoreParts.push('<strong>EM:</strong> ' + formatMetricValue(item.exact_match));
       }
-      
-      // Display F1 score
       if (item.f1_score !== null && item.f1_score !== undefined) {
-        const f1Value = parseFloat(item.f1_score);
-        if (!isNaN(f1Value)) {
-          hasAnyScore = true;
-          const f1Div = document.createElement('div');
-          const f1Label = document.createElement('span');
-          f1Label.textContent = 'F1: ';
-          f1Label.style.fontWeight = '600';
-          f1Label.style.color = '#495057';
-          const f1Score = document.createElement('span');
-          f1Score.textContent = f1Value.toFixed(4);
-          f1Score.style.fontWeight = '600';
-          // Color code based on F1 score: green for high (>0.5), yellow for medium (>0.2), red for low
-          if (f1Value >= 0.5) {
-            f1Score.style.color = '#198754';
-          } else if (f1Value >= 0.2) {
-            f1Score.style.color = '#ffc107';
-          } else {
-            f1Score.style.color = '#dc3545';
-          }
-          f1Div.appendChild(f1Label);
-          f1Div.appendChild(f1Score);
-          scoreContainer.appendChild(f1Div);
-        }
+        scoreParts.push('<strong>F1:</strong> ' + formatMetricValue(item.f1_score));
       }
-      
-      // Display ROUGE-L score
       if (item.rouge_l_score !== null && item.rouge_l_score !== undefined) {
-        const rougeLValue = parseFloat(item.rouge_l_score);
-        if (!isNaN(rougeLValue)) {
-          hasAnyScore = true;
-          const rougeLDiv = document.createElement('div');
-          const rougeLLabel = document.createElement('span');
-          rougeLLabel.textContent = 'ROUGE-L: ';
-          rougeLLabel.style.fontWeight = '600';
-          rougeLLabel.style.color = '#495057';
-          const rougeLScore = document.createElement('span');
-          rougeLScore.textContent = rougeLValue.toFixed(4);
-          rougeLScore.style.fontWeight = '600';
-          // Color code based on ROUGE-L score: green for high (>0.5), yellow for medium (>0.2), red for low
-          if (rougeLValue >= 0.5) {
-            rougeLScore.style.color = '#198754';
-          } else if (rougeLValue >= 0.2) {
-            rougeLScore.style.color = '#ffc107';
-          } else {
-            rougeLScore.style.color = '#dc3545';
-          }
-          rougeLDiv.appendChild(rougeLLabel);
-          rougeLDiv.appendChild(rougeLScore);
-          scoreContainer.appendChild(rougeLDiv);
-        }
+        scoreParts.push('<strong>R-L:</strong> ' + formatMetricValue(item.rouge_l_score));
       }
-      
-      // Display BLEU score
       if (item.bleu_score !== null && item.bleu_score !== undefined) {
-        const bleuValue = parseFloat(item.bleu_score);
-        if (!isNaN(bleuValue)) {
-          hasAnyScore = true;
-          const bleuDiv = document.createElement('div');
-          const bleuLabel = document.createElement('span');
-          bleuLabel.textContent = 'BLEU: ';
-          bleuLabel.style.fontWeight = '600';
-          bleuLabel.style.color = '#495057';
-          const bleuScore = document.createElement('span');
-          bleuScore.textContent = bleuValue.toFixed(4);
-          bleuScore.style.fontWeight = '600';
-          // Color code based on BLEU score: green for high (>0.5), yellow for medium (>0.2), red for low
-          if (bleuValue >= 0.5) {
-            bleuScore.style.color = '#198754';
-          } else if (bleuValue >= 0.2) {
-            bleuScore.style.color = '#ffc107';
-          } else {
-            bleuScore.style.color = '#dc3545';
-          }
-          bleuDiv.appendChild(bleuLabel);
-          bleuDiv.appendChild(bleuScore);
-          scoreContainer.appendChild(bleuDiv);
-        }
+        scoreParts.push('<strong>BLEU:</strong> ' + formatMetricValue(item.bleu_score));
       }
-      
-      if (hasAnyScore) {
-        scoreCell.appendChild(scoreContainer);
-      } else {
-        scoreCell.innerHTML = '<em style="color: #6c757d;">N/A</em>';
-      }
-
+      scoreCell.innerHTML = scoreParts.length > 0 ? scoreParts.join('<br>') : '<em>No scores</em>';
       row.appendChild(articleCell);
       row.appendChild(questionCell);
       row.appendChild(answerCell);
       row.appendChild(refCell);
       row.appendChild(scoreCell);
-      resultsBody.appendChild(row);
+      tbody.appendChild(row);
+    }
+
+    function renderDatasetTabs(allResults, statsData) {
+      if (!datasetTabsContainer) {
+        return;
+      }
+
+      // Group results by dataset
+      const resultsByDataset = {};
+      allResults.forEach((result) => {
+        const dataset = result.dataset || 'unknown';
+        if (!resultsByDataset[dataset]) {
+          resultsByDataset[dataset] = [];
+        }
+        resultsByDataset[dataset].push(result);
+      });
+
+      const datasets = Object.keys(resultsByDataset);
+      if (datasets.length === 0) {
+        datasetTabsContainer.innerHTML = '';
+        if (emptyStateContainer) {
+          emptyStateContainer.style.display = 'block';
+        }
+        return;
+      }
+
+      if (emptyStateContainer) {
+        emptyStateContainer.style.display = 'none';
+      }
+
+      // Preserve expanded state before clearing
+      const existingTabs = datasetTabsContainer.querySelectorAll('.dataset-tab');
+      existingTabs.forEach((tab) => {
+        const datasetId = tab.id.replace('tab-', '');
+        const header = tab.querySelector('.tab-header');
+        const content = tab.querySelector('.tab-content');
+        if (header && content) {
+          const isExpanded = content.classList.contains('expanded');
+          if (isExpanded) {
+            tabExpandedState[datasetId] = true;
+          } else if (tabExpandedState[datasetId] === undefined) {
+            // Only set to false if not previously tracked
+            tabExpandedState[datasetId] = false;
+          }
+        }
+      });
+
+      datasetTabsContainer.innerHTML = '';
+
+      datasets.forEach((dataset) => {
+        // Restore expanded state if previously expanded
+        const shouldBeExpanded = tabExpandedState[dataset] === true;
+        const datasetResults = resultsByDataset[dataset] || [];
+        const stats = statsData[dataset] || { count: 0, metrics: {} };
+        const datasetLabel = {
+          'qasper': 'QASPER',
+          'qmsum': 'QMSum',
+          'narrativeqa': 'NarrativeQA',
+          'quality': 'QuALITY',
+          'hotpot': 'HotpotQA',
+          'musique': 'MuSiQue'
+        }[dataset] || dataset;
+
+        const tab = document.createElement('div');
+        tab.className = 'dataset-tab';
+        tab.id = 'tab-' + dataset;
+
+        const header = document.createElement('div');
+        header.className = shouldBeExpanded ? 'tab-header' : 'tab-header collapsed';
+
+        const headerRow = document.createElement('div');
+        headerRow.className = 'tab-header-row';
+
+        const title = document.createElement('div');
+        title.className = 'tab-title';
+        title.textContent = datasetLabel + ' (' + stats.count + ' questions)';
+
+        const toggle = document.createElement('span');
+        toggle.className = 'tab-toggle';
+        toggle.textContent = '▼';
+
+        headerRow.appendChild(title);
+        headerRow.appendChild(toggle);
+
+        const statsRow = document.createElement('div');
+        statsRow.className = 'tab-stats';
+        
+        const metrics = [
+          { key: 'exact_match', label: 'EM' },
+          { key: 'f1_score', label: 'F1' },
+          { key: 'rouge_l_score', label: 'ROUGE-L' },
+          { key: 'bleu_score', label: 'BLEU' }
+        ];
+
+        metrics.forEach((metric) => {
+          const metricStat = stats.metrics[metric.key] || {};
+          const avg = metricStat.average;
+          if (avg !== null && avg !== undefined && !isNaN(avg)) {
+            const statItem = document.createElement('div');
+            statItem.className = 'tab-stat-item';
+            const label = document.createElement('span');
+            label.className = 'tab-stat-label';
+            label.textContent = metric.label + ':';
+            const value = document.createElement('span');
+            value.className = 'tab-stat-value';
+            value.textContent = formatMetricShort(avg);
+            statItem.appendChild(label);
+            statItem.appendChild(value);
+            statsRow.appendChild(statItem);
+          }
+        });
+
+        header.appendChild(headerRow);
+        header.appendChild(statsRow);
+
+        const content = document.createElement('div');
+        // Restore expanded state if previously expanded
+        content.className = shouldBeExpanded ? 'tab-content expanded' : 'tab-content';
+
+        if (datasetResults.length === 0) {
+          const emptyState = document.createElement('div');
+          emptyState.className = 'tab-empty-state';
+          emptyState.textContent = 'No results for this dataset.';
+          content.appendChild(emptyState);
+        } else {
+          const table = document.createElement('table');
+          table.className = 'tab-results-table';
+          
+          const thead = document.createElement('thead');
+          const headerRow = document.createElement('tr');
+          const headers = ['Article', 'Question', 'Generated Answer', 'Reference Answers', 'Score'];
+          headers.forEach(h => {
+            const th = document.createElement('th');
+            th.textContent = h;
+            headerRow.appendChild(th);
+          });
+          thead.appendChild(headerRow);
+          table.appendChild(thead);
+
+          const tbody = document.createElement('tbody');
+          // Render all results for this dataset
+          datasetResults.forEach((result) => {
+            appendResultRowToTable(tbody, result);
+          });
+
+          table.appendChild(tbody);
+          content.appendChild(table);
+        }
+
+        header.onclick = function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          const isCollapsed = header.classList.contains('collapsed');
+          if (isCollapsed) {
+            // Expand: remove collapsed, add expanded
+            header.classList.remove('collapsed');
+            content.classList.add('expanded');
+            tabExpandedState[dataset] = true;
+          } else {
+            // Collapse: add collapsed, remove expanded
+            header.classList.add('collapsed');
+            content.classList.remove('expanded');
+            tabExpandedState[dataset] = false;
+          }
+        };
+
+        tab.appendChild(header);
+        tab.appendChild(content);
+        datasetTabsContainer.appendChild(tab);
+      });
     }
 
     function fetchResults() {
@@ -581,37 +999,45 @@ TEMPLATE = """
           if (totalQuestions) {
             totalQuestions.textContent = String(data.length);
           }
-          if (data.length > 0) {
-            if (resultsTable.hidden) {
-              resultsTable.hidden = false;
-            }
-            if (!emptyState.hidden) {
-              emptyState.hidden = true;
-            }
-            for (; renderedCount < data.length; renderedCount += 1) {
-              appendResultRow(data[renderedCount]);
-            }
-          } else if (renderedCount === 0) {
-            resultsTable.hidden = true;
-            emptyState.hidden = false;
-          }
+          
+          // Fetch statistics and render tabs
+          fetch('/api/statistics')
+            .then((res) => res.json())
+            .then((stats) => {
+              renderDatasetTabs(data, stats);
+            })
+            .catch((err) => {
+              console.error('Failed to fetch statistics', err);
+              renderDatasetTabs(data, {});
+            });
         })
         .catch((err) => console.error('Failed to fetch results', err));
     }
 
     function resetResultsDisplay() {
-      renderedCount = 0;
-      resultsBody.innerHTML = '';
-      resultsTable.hidden = true;
-      emptyState.hidden = false;
-      emptyState.textContent = 'Running tests... results will appear here.';
+      renderedResultsByDataset = {};
+      if (datasetTabsContainer) {
+        datasetTabsContainer.innerHTML = '';
+      }
+      if (emptyStateContainer) {
+        emptyStateContainer.style.display = 'block';
+        emptyStateContainer.textContent = 'Running tests... results will appear here.';
+      }
       if (totalQuestions) {
         totalQuestions.textContent = '0';
       }
     }
 
-    if (runButton) {
-      runButton.addEventListener('click', () => {
+    console.log('Setting up event listeners...');
+    console.log('runButton found:', !!runButton);
+    
+    try {
+      if (runButton) {
+        console.log('Attaching click event listener to run button');
+        runButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Run Tests button clicked');
         runButton.disabled = true;
         runStatus.textContent = 'Starting tests...';
         resetResultsDisplay();
@@ -655,6 +1081,25 @@ TEMPLATE = """
         if (generatorSelect && generatorValue !== generatorDefault) {
           overrides.generator_model = generatorValue;
         }
+        
+        // Handle multiple dataset selection from checkboxes
+        const checkedDatasets = Array.from(datasetCheckboxes)
+          .filter(cb => cb.checked)
+          .map(cb => cb.value);
+        
+        if (checkedDatasets.length === 0) {
+          runStatus.textContent = 'Please select at least one dataset.';
+          runButton.disabled = false;
+          return;
+        }
+        
+        if (checkedDatasets.length === 1) {
+          // Single dataset - use legacy 'dataset' field for backward compatibility
+          overrides.dataset = checkedDatasets[0];
+        } else {
+          // Multiple datasets - use 'datasets' array
+          overrides.datasets = checkedDatasets;
+        }
         if (generatorValue === 'chatgpt5') {
           const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
           if (!apiKey) {
@@ -669,13 +1114,24 @@ TEMPLATE = """
           }
           overrides.chatgpt5_api_key = apiKey;
         }
+        
+        // Add split parameter from the config display (it should be available)
+        const splitDisplay = document.getElementById('config-split');
+        if (splitDisplay && splitDisplay.textContent) {
+          overrides.split = splitDisplay.textContent.trim();
+        }
+        
+        console.log('Sending test run request with overrides:', { ...overrides, chatgpt5_api_key: overrides.chatgpt5_api_key ? '***' : undefined });
+        
         fetch('/run-tests', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(overrides),
         })
           .then(async (res) => {
+            console.log('Response status:', res.status, res.statusText);
             const data = await res.json();
+            console.log('Response data:', data);
             if (!res.ok) {
               throw new Error(data.message || 'Failed to start tests');
             }
@@ -683,16 +1139,32 @@ TEMPLATE = """
             fetchResults();
           })
           .catch((err) => {
-            runStatus.textContent = 'Error: ' + err.message;
+            console.error('Fetch error:', err);
+            runStatus.textContent = 'Error: ' + (err.message || 'Failed to start tests. Check console for details.');
             runButton.disabled = false;
           });
-      });
+        });
+        
+        console.log('Event listener attached successfully');
+      } else {
+        console.error('runButton element not found! Cannot attach event listener.');
+      }
+    } catch (err) {
+      console.error('Error setting up event listeners:', err);
+      if (runStatus) {
+        runStatus.textContent = 'Error: Failed to set up button. Check console for details.';
+      }
+    }
 
+    try {
       setInterval(() => {
         pollStatus();
         fetchResults();
       }, 3000);
       fetchResults();
+      console.log('Polling interval set up successfully');
+    } catch (err) {
+      console.error('Error setting up polling:', err);
     }
   </script>
 </body>
@@ -702,6 +1174,8 @@ TEMPLATE = """
 
 @app.route("/")
 def index():
+    default_dataset = getattr(TEST_OPTIONS, "dataset", "qasper")
+    default_datasets = getattr(TEST_OPTIONS, "datasets", None)
     return render_template_string(
         TEMPLATE,
         results_path=RESULTS_PATH,
@@ -713,6 +1187,8 @@ def index():
             "articles": TEST_OPTIONS.articles,
             "questions_per_article": TEST_OPTIONS.questions_per_article,
             "split": TEST_OPTIONS.split,
+            "dataset": default_dataset,  # For backward compatibility
+            "datasets": default_datasets if default_datasets else [default_dataset],
             "show_context": TEST_OPTIONS.show_context,
         },
     )
@@ -753,9 +1229,19 @@ def api_results():
     return jsonify(load_results())
 
 
+@app.route("/api/statistics")
+def api_statistics():
+    """Return statistics for each dataset."""
+    results = load_results()
+    stats = calculate_dataset_statistics(results)
+    return jsonify(stats)
+
+
 @app.route("/run-tests", methods=["POST"])
 def trigger_run():
+    app.logger.info("Received POST request to /run-tests")
     payload = request.get_json(silent=True) or {}
+    app.logger.info("Request payload (without API key): %s", {k: v for k, v in payload.items() if k != "chatgpt5_api_key"})
     options_dict = vars(TEST_OPTIONS).copy()
 
     for field in ("retrieval_k", "chunk_size", "questions_per_article", "articles"):
@@ -768,8 +1254,32 @@ def trigger_run():
     if "show_context" in payload:
         options_dict["show_context"] = bool(payload["show_context"])
 
+    if "split" in payload and payload["split"]:
+        options_dict["split"] = str(payload["split"]).strip()
+
     if "generator_model" in payload and payload["generator_model"]:
         options_dict["generator_model"] = str(payload["generator_model"]).strip()
+
+    # Handle dataset selection (single or multiple)
+    if "datasets" in payload and isinstance(payload["datasets"], list) and payload["datasets"]:
+        # Multiple datasets
+        datasets = [str(d).strip().lower() for d in payload["datasets"]]
+        valid_datasets = [d for d in datasets if d in ("qasper", "qmsum", "narrativeqa", "quality", "hotpot", "musique")]
+        if valid_datasets:
+            if len(valid_datasets) == 1:
+                # Single dataset - use legacy field for compatibility
+                options_dict["dataset"] = valid_datasets[0]
+            else:
+                # Multiple datasets
+                options_dict["datasets"] = valid_datasets
+                options_dict["dataset"] = valid_datasets[0]  # Keep for backward compatibility
+        else:
+            options_dict["dataset"] = "qasper"
+    elif "dataset" in payload and payload["dataset"]:
+        # Single dataset (legacy support)
+        options_dict["dataset"] = str(payload["dataset"]).strip().lower()
+        if options_dict["dataset"] not in ("qasper", "qmsum", "narrativeqa", "quality", "hotpot", "musique"):
+            options_dict["dataset"] = "qasper"
 
     generator_value = str(options_dict.get("generator_model", TEST_OPTIONS.generator_model or "t5-small")).lower()
     api_key_override = payload.get("chatgpt5_api_key")
@@ -782,11 +1292,16 @@ def trigger_run():
         options_dict["chatgpt5_api_key"] = None
 
     updated_options = argparse.Namespace(**options_dict)
+    
+    # Log the options being used
+    app.logger.info("Triggering test run with options: %s", {k: v for k, v in options_dict.items() if k != "chatgpt5_api_key"})
 
     clear_results_file()
     RUN_STATE["message"] = "Test run initiated..."
     if not start_test_run(updated_options, async_run=True):
+        app.logger.warning("Failed to start test run: lock already held")
         return jsonify({"status": "busy", "message": "A run is already in progress."}), 409
+    app.logger.info("Test run started successfully")
     return jsonify({"status": "running", "message": "Test run started..."})
 
 
@@ -810,7 +1325,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chatgpt5-api-key", default=None, help="API key for ChatGPT5 generator.")
     parser.add_argument("--show-context", dest="show_context", action="store_true", help="Display retrieved context in outputs.")
     parser.add_argument("--hide-context", dest="show_context", action="store_false", help="Hide retrieved context in outputs.")
-    parser.set_defaults(show_context=True)
+    parser.set_defaults(show_context=False)
+    parser.add_argument("--dataset", choices=["qasper", "qmsum", "narrativeqa", "quality", "hotpot", "musique"], default="qasper", help="Dataset to use: 'qasper', 'qmsum', 'narrativeqa', 'quality', 'hotpot', or 'musique'.")
     parser.add_argument("--log-level", default="INFO", help="Log level passed to the test script.")
     parser.add_argument("--results-path", default=str(DEFAULT_RESULTS_PATH), help="Where to write the results JSON.")
     parser.add_argument("--host", default="0.0.0.0", help="Interface host.")

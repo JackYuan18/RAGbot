@@ -10,7 +10,12 @@
       "multilingual NMT (MNMT) BIBREF19"
     ],
     "retrieved_context": [],
-    "generator": "t5-small"
+    "generator": "t5-small",
+    "dataset": "qasper",
+    "bleu_score": null,
+    "exact_match": 0.0,
+    "f1_score": null,
+    "rouge_l_score": null
   },
   {
     "article_id": "1912.01214",
@@ -23,7 +28,12 @@
       "firstly translates a source language into the pivot language which is later translated to the target language"
     ],
     "retrieved_context": [],
-    "generator": "t5-small"
+    "generator": "t5-small",
+    "dataset": "qasper",
+    "bleu_score": 0.004863083928997274,
+    "exact_match": 0.0,
+    "f1_score": 0.0625,
+    "rouge_l_score": 0.07023603914795624
   },
   {
     "article_id": "1912.01214",
@@ -37,6 +47,158 @@
       "MultiUN BIBREF32"
     ],
     "retrieved_context": [],
-    "generator": "t5-small"
+    "generator": "t5-small",
+    "dataset": "qasper",
+    "bleu_score": 0.003148013662646501,
+    "exact_match": 0.0,
+    "f1_score": 0.04166666666666667,
+    "rouge_l_score": 0.041049798115746966
+  },
+  {
+    "article_id": "0029bdbe75423337b551e42bb31f9a102785376f",
+    "title": "Unknown title",
+    "question": "Who is Miss Delmer?",
+    "generated_answer": "Percival is a young teenager, and is promoted to captain . he is able to convince the captain to spare the lives of a wealthy Dutch merchant and his young daughter .\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "the elderly spinster aunt of the Earl de Verseley and Captain Delmar",
+      "She's Captail Delmar's aunt."
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small",
+    "dataset": "narrativeqa",
+    "bleu_score": 0.007711727065811939,
+    "exact_match": 0.0,
+    "f1_score": 0.21621621621621623,
+    "rouge_l_score": 0.13738738738738737
+  },
+  {
+    "article_id": "0029bdbe75423337b551e42bb31f9a102785376f",
+    "title": "Unknown title",
+    "question": "Who does Arabella Mason wed?",
+    "generated_answer": "Arabella Mason, the daughter of a deceased, well-liked steward, is a guest . Percival is able to convince the captain to spare the lives of a wealthy Dutch merchant and his young daughter, Minnie .\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "Ben Keene, Delmar's valet",
+      "Ben Keene"
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small",
+    "dataset": "narrativeqa",
+    "bleu_score": null,
+    "exact_match": 0.0,
+    "f1_score": null,
+    "rouge_l_score": null
+  },
+  {
+    "article_id": "0029bdbe75423337b551e42bb31f9a102785376f",
+    "title": "Unknown title",
+    "question": "How does Percival Keene get his name?",
+    "generated_answer": "Percival is a young teenager, and is able to convince his fellow shipman of his true identity . he is captured during a pirate raid along with others, and is taken as a prisoner .\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "Percival is Captain Delmar's first name, and Keene is Ben's last name",
+      "Captain's name and Ben's surname"
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small",
+    "dataset": "narrativeqa",
+    "bleu_score": 0.011931001236437418,
+    "exact_match": 0.0,
+    "f1_score": 0.14285714285714285,
+    "rouge_l_score": 0.1734186211798152
+  },
+  {
+    "article_id": "52845",
+    "title": "The Girl in His Mind",
+    "question": "How much time has passed between Blake's night with Eldoria and his search for Sabrina York in his mind-world?",
+    "generated_answer": "Sabrina York: \"No, not yet. I'll walk back to the sorority house with you\"\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "10 hours"
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small",
+    "dataset": "quality",
+    "bleu_score": null,
+    "exact_match": 0.0,
+    "f1_score": null,
+    "rouge_l_score": null
+  },
+  {
+    "article_id": "52845",
+    "title": "The Girl in His Mind",
+    "question": "Why does Deirdre get so upset when Blake Past suggests she go to prom with the young man?",
+    "generated_answer": "Blake Past stood up too. \"No, not yet. I'll walk back to the sorority house with you.\" Blake Present watched them set out side by side toward the remembered halls of learning that showed in distance .\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "Because Deirdre has fallen in love with Blake, despite his age, and wants him to take her to the prom."
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small",
+    "dataset": "quality",
+    "bleu_score": 0.011326402345230238,
+    "exact_match": 0.0,
+    "f1_score": 0.14035087719298245,
+    "rouge_l_score": 0.06991404011461319
+  },
+  {
+    "article_id": "52845",
+    "title": "The Girl in His Mind",
+    "question": "Why does shame flame in Blake's cheeks when Deirdre goes to prepare Eldoria's dias?",
+    "generated_answer": "Shame flamed in Blake's cheeks, and for a moment he considered leaving . \"Eldoria will be arriving soon. I must go and prepare her dais,\" he said .\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "He feels guilty about sleeping with Eldoria when there's a child in the hut, Deirdre, who knows exactly what's going on."
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small",
+    "dataset": "quality",
+    "bleu_score": 0.007678432706586176,
+    "exact_match": 0.0,
+    "f1_score": 0.12000000000000001,
+    "rouge_l_score": 0.03920308483290488
+  },
+  {
+    "article_id": "52845",
+    "title": "The Girl in His Mind",
+    "question": "How much time has passed between Blake's night with Eldoria and his search for Sabrina York in his mind-world?",
+    "generated_answer": "Sabrina York: \"No, not yet. I'll walk back to the sorority house with you\"\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "10 hours"
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small",
+    "dataset": "quality",
+    "bleu_score": null,
+    "exact_match": 0.0,
+    "f1_score": null,
+    "rouge_l_score": null
+  },
+  {
+    "article_id": "52845",
+    "title": "The Girl in His Mind",
+    "question": "Why does Deirdre get so upset when Blake Past suggests she go to prom with the young man?",
+    "generated_answer": "Blake Past stood up too. \"No, not yet. I'll walk back to the sorority house with you.\" Blake Present watched them set out side by side toward the remembered halls of learning that showed in distance .\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "Because Deirdre has fallen in love with Blake, despite his age, and wants him to take her to the prom."
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small",
+    "dataset": "quality",
+    "bleu_score": 0.011326402345230238,
+    "exact_match": 0.0,
+    "f1_score": 0.14035087719298245,
+    "rouge_l_score": 0.06991404011461319
+  },
+  {
+    "article_id": "52845",
+    "title": "The Girl in His Mind",
+    "question": "Why does shame flame in Blake's cheeks when Deirdre goes to prepare Eldoria's dias?",
+    "generated_answer": "Shame flamed in Blake's cheeks, and for a moment he considered leaving . \"Eldoria will be arriving soon. I must go and prepare her dais,\" he said .\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "He feels guilty about sleeping with Eldoria when there's a child in the hut, Deirdre, who knows exactly what's going on."
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small",
+    "dataset": "quality",
+    "bleu_score": 0.007678432706586176,
+    "exact_match": 0.0,
+    "f1_score": 0.12000000000000001,
+    "rouge_l_score": 0.03920308483290488
   }
 ]
