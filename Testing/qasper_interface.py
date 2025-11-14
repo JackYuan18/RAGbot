@@ -240,10 +240,11 @@ TEMPLATE = """
     <table id="results-table" hidden>
     <thead>
       <tr>
-        <th style="width: 20%">Article</th>
-        <th style="width: 30%">Question</th>
-        <th style="width: 30%">Generated Answer</th>
+        <th style="width: 15%">Article</th>
+        <th style="width: 25%">Question</th>
+        <th style="width: 25%">Generated Answer</th>
         <th style="width: 20%">Reference Answers</th>
+        <th style="width: 15%">Score</th>
       </tr>
     </thead>
       <tbody id="results-body"></tbody>
@@ -444,10 +445,129 @@ TEMPLATE = """
         refCell.appendChild(placeholder);
       }
 
+      const scoreCell = document.createElement('td');
+      scoreCell.style.verticalAlign = 'top';
+      scoreCell.style.fontSize = '0.9rem';
+      
+      const scoreContainer = document.createElement('div');
+      scoreContainer.style.display = 'flex';
+      scoreContainer.style.flexDirection = 'column';
+      scoreContainer.style.gap = '0.5rem';
+      
+      let hasAnyScore = false;
+      
+      // Display Exact Match score
+      if (item.exact_match !== null && item.exact_match !== undefined) {
+        const emValue = parseFloat(item.exact_match);
+        if (!isNaN(emValue)) {
+          hasAnyScore = true;
+          const emDiv = document.createElement('div');
+          const emLabel = document.createElement('span');
+          emLabel.textContent = 'EM: ';
+          emLabel.style.fontWeight = '600';
+          emLabel.style.color = '#495057';
+          const emScore = document.createElement('span');
+          emScore.textContent = emValue.toFixed(4);
+          emScore.style.fontWeight = '600';
+          emScore.style.color = emValue >= 1.0 ? '#198754' : '#dc3545';
+          emDiv.appendChild(emLabel);
+          emDiv.appendChild(emScore);
+          scoreContainer.appendChild(emDiv);
+        }
+      }
+      
+      // Display F1 score
+      if (item.f1_score !== null && item.f1_score !== undefined) {
+        const f1Value = parseFloat(item.f1_score);
+        if (!isNaN(f1Value)) {
+          hasAnyScore = true;
+          const f1Div = document.createElement('div');
+          const f1Label = document.createElement('span');
+          f1Label.textContent = 'F1: ';
+          f1Label.style.fontWeight = '600';
+          f1Label.style.color = '#495057';
+          const f1Score = document.createElement('span');
+          f1Score.textContent = f1Value.toFixed(4);
+          f1Score.style.fontWeight = '600';
+          // Color code based on F1 score: green for high (>0.5), yellow for medium (>0.2), red for low
+          if (f1Value >= 0.5) {
+            f1Score.style.color = '#198754';
+          } else if (f1Value >= 0.2) {
+            f1Score.style.color = '#ffc107';
+          } else {
+            f1Score.style.color = '#dc3545';
+          }
+          f1Div.appendChild(f1Label);
+          f1Div.appendChild(f1Score);
+          scoreContainer.appendChild(f1Div);
+        }
+      }
+      
+      // Display ROUGE-L score
+      if (item.rouge_l_score !== null && item.rouge_l_score !== undefined) {
+        const rougeLValue = parseFloat(item.rouge_l_score);
+        if (!isNaN(rougeLValue)) {
+          hasAnyScore = true;
+          const rougeLDiv = document.createElement('div');
+          const rougeLLabel = document.createElement('span');
+          rougeLLabel.textContent = 'ROUGE-L: ';
+          rougeLLabel.style.fontWeight = '600';
+          rougeLLabel.style.color = '#495057';
+          const rougeLScore = document.createElement('span');
+          rougeLScore.textContent = rougeLValue.toFixed(4);
+          rougeLScore.style.fontWeight = '600';
+          // Color code based on ROUGE-L score: green for high (>0.5), yellow for medium (>0.2), red for low
+          if (rougeLValue >= 0.5) {
+            rougeLScore.style.color = '#198754';
+          } else if (rougeLValue >= 0.2) {
+            rougeLScore.style.color = '#ffc107';
+          } else {
+            rougeLScore.style.color = '#dc3545';
+          }
+          rougeLDiv.appendChild(rougeLLabel);
+          rougeLDiv.appendChild(rougeLScore);
+          scoreContainer.appendChild(rougeLDiv);
+        }
+      }
+      
+      // Display BLEU score
+      if (item.bleu_score !== null && item.bleu_score !== undefined) {
+        const bleuValue = parseFloat(item.bleu_score);
+        if (!isNaN(bleuValue)) {
+          hasAnyScore = true;
+          const bleuDiv = document.createElement('div');
+          const bleuLabel = document.createElement('span');
+          bleuLabel.textContent = 'BLEU: ';
+          bleuLabel.style.fontWeight = '600';
+          bleuLabel.style.color = '#495057';
+          const bleuScore = document.createElement('span');
+          bleuScore.textContent = bleuValue.toFixed(4);
+          bleuScore.style.fontWeight = '600';
+          // Color code based on BLEU score: green for high (>0.5), yellow for medium (>0.2), red for low
+          if (bleuValue >= 0.5) {
+            bleuScore.style.color = '#198754';
+          } else if (bleuValue >= 0.2) {
+            bleuScore.style.color = '#ffc107';
+          } else {
+            bleuScore.style.color = '#dc3545';
+          }
+          bleuDiv.appendChild(bleuLabel);
+          bleuDiv.appendChild(bleuScore);
+          scoreContainer.appendChild(bleuDiv);
+        }
+      }
+      
+      if (hasAnyScore) {
+        scoreCell.appendChild(scoreContainer);
+      } else {
+        scoreCell.innerHTML = '<em style="color: #6c757d;">N/A</em>';
+      }
+
       row.appendChild(articleCell);
       row.appendChild(questionCell);
       row.appendChild(answerCell);
       row.appendChild(refCell);
+      row.appendChild(scoreCell);
       resultsBody.appendChild(row);
     }
 
@@ -694,7 +814,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log-level", default="INFO", help="Log level passed to the test script.")
     parser.add_argument("--results-path", default=str(DEFAULT_RESULTS_PATH), help="Where to write the results JSON.")
     parser.add_argument("--host", default="0.0.0.0", help="Interface host.")
-    parser.add_argument("--port", type=int, default=5050, help="Interface port.")
+    parser.add_argument("--port", type=int, default=5051, help="Interface port.")
     parser.add_argument("--run-on-start", action="store_true", help="Run the test suite automatically at startup.")
     parser.add_argument("--open-browser", action="store_true", help="Open the interface in the default browser.")
     return parser.parse_args()

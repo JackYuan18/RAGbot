@@ -25,6 +25,20 @@ except ModuleNotFoundError as exc:
         "Missing dependency 'datasets'. Install it with `pip install datasets`."
     ) from exc
 
+try:
+    from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction  # type: ignore
+    import nltk  # type: ignore
+    
+    # Download necessary NLTK data if not already present
+    try:
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        nltk.download('punkt', quiet=True)
+except ModuleNotFoundError:
+    sentence_bleu = None  # type: ignore
+    SmoothingFunction = None  # type: ignore
+    logging.warning("NLTK not available. BLEU scores will not be calculated.")
+
 CURRENT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = CURRENT_DIR.parent
 
@@ -160,6 +174,216 @@ def extract_reference_answers(answers: Any) -> List[str]:
             seen.add(text)
             unique.append(text)
     return unique
+
+
+def normalize_text(text: str) -> str:
+    """Normalize text for comparison: lowercase, strip, and remove extra whitespace."""
+    return " ".join(text.lower().strip().split())
+
+
+def calculate_exact_match(generated_answer: str, reference_answers: List[str]) -> Optional[float]:
+    """
+    Calculate Exact Match score between generated answer and reference answers.
+    
+    Returns 1.0 if the generated answer exactly matches any reference answer (after normalization),
+    or 0.0 if no match is found. Returns None if there are no reference answers.
+    """
+    if not reference_answers:
+        return None
+    
+    try:
+        normalized_generated = normalize_text(generated_answer)
+        
+        if not normalized_generated:
+            return 0.0
+        
+        for ref_answer in reference_answers:
+            if not ref_answer.strip():
+                continue
+            normalized_ref = normalize_text(ref_answer)
+            if normalized_generated == normalized_ref:
+                return 1.0
+        
+        return 0.0
+    except Exception as exc:
+        logging.warning("Failed to calculate Exact Match score: %s", exc)
+        return None
+
+
+def calculate_f1_score(generated_answer: str, reference_answers: List[str]) -> Optional[float]:
+    """
+    Calculate F1 score (token-level) between generated answer and reference answers.
+    
+    Returns the maximum F1 score across all reference answers, or None if
+    there are no reference answers.
+    
+    F1 = 2 * (precision * recall) / (precision + recall)
+    where precision = common_tokens / generated_tokens
+    and recall = common_tokens / reference_tokens
+    """
+    if not reference_answers:
+        return None
+    
+    try:
+        generated_tokens = set(normalize_text(generated_answer).split())
+        
+        if not generated_tokens:
+            return 0.0
+        
+        max_f1 = 0.0
+        
+        for ref_answer in reference_answers:
+            if not ref_answer.strip():
+                continue
+            reference_tokens = set(normalize_text(ref_answer).split())
+            if not reference_tokens:
+                continue
+            
+            # Calculate common tokens
+            common_tokens = generated_tokens & reference_tokens
+            
+            if not common_tokens:
+                continue
+            
+            # Calculate precision and recall
+            precision = len(common_tokens) / len(generated_tokens) if generated_tokens else 0.0
+            recall = len(common_tokens) / len(reference_tokens) if reference_tokens else 0.0
+            
+            # Calculate F1 score
+            if precision + recall > 0:
+                f1 = 2 * (precision * recall) / (precision + recall)
+                max_f1 = max(max_f1, f1)
+        
+        return max_f1 if max_f1 > 0.0 else None
+    except Exception as exc:
+        logging.warning("Failed to calculate F1 score: %s", exc)
+        return None
+
+
+def longest_common_subsequence_length(seq1: List[str], seq2: List[str]) -> int:
+    """
+    Calculate the length of the longest common subsequence (LCS) between two sequences.
+    
+    Uses dynamic programming approach.
+    """
+    if not seq1 or not seq2:
+        return 0
+    
+    m, n = len(seq1), len(seq2)
+    # Create a 2D table to store LCS lengths
+    dp = [[0] * (n + 1) for _ in range(m + 1)]
+    
+    # Fill the table bottom-up
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if seq1[i - 1] == seq2[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1
+            else:
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+    
+    return dp[m][n]
+
+
+def calculate_rouge_l_score(generated_answer: str, reference_answers: List[str], beta: float = 1.2) -> Optional[float]:
+    """
+    Calculate ROUGE-L score between generated answer and reference answers.
+    
+    ROUGE-L measures the longest common subsequence (LCS) based F-measure.
+    
+    Formula:
+    - R_LCS = LCS_length / reference_length (recall)
+    - P_LCS = LCS_length / candidate_length (precision)
+    - F_LCS = ((1 + beta^2) * R_LCS * P_LCS) / (R_LCS + beta^2 * P_LCS)
+    
+    Returns the maximum ROUGE-L score across all reference answers, or None if
+    there are no reference answers.
+    
+    Args:
+        generated_answer: The generated answer text
+        reference_answers: List of reference answer texts
+        beta: Parameter for F-measure calculation (default 1.2, common for ROUGE-L)
+    """
+    if not reference_answers:
+        return None
+    
+    try:
+        generated_tokens = normalize_text(generated_answer).split()
+        
+        if not generated_tokens:
+            return 0.0
+        
+        max_rouge_l = 0.0
+        
+        for ref_answer in reference_answers:
+            if not ref_answer.strip():
+                continue
+            reference_tokens = normalize_text(ref_answer).split()
+            if not reference_tokens:
+                continue
+            
+            # Calculate LCS length
+            lcs_length = longest_common_subsequence_length(reference_tokens, generated_tokens)
+            
+            if lcs_length == 0:
+                continue
+            
+            # Calculate recall and precision
+            recall_lcs = lcs_length / len(reference_tokens) if reference_tokens else 0.0
+            precision_lcs = lcs_length / len(generated_tokens) if generated_tokens else 0.0
+            
+            # Calculate ROUGE-L F-score
+            if recall_lcs + precision_lcs > 0:
+                rouge_l = (
+                    (1 + beta * beta) * recall_lcs * precision_lcs
+                ) / (recall_lcs + beta * beta * precision_lcs)
+                max_rouge_l = max(max_rouge_l, rouge_l)
+        
+        return max_rouge_l if max_rouge_l > 0.0 else None
+    except Exception as exc:
+        logging.warning("Failed to calculate ROUGE-L score: %s", exc)
+        return None
+
+
+def calculate_bleu_score(generated_answer: str, reference_answers: List[str]) -> Optional[float]:
+    """
+    Calculate BLEU score between generated answer and reference answers.
+    
+    Returns the maximum BLEU score across all reference answers, or None if
+    NLTK is not available or if there are no reference answers.
+    """
+    if sentence_bleu is None or not reference_answers:
+        return None
+    
+    try:
+        # Tokenize generated answer
+        generated_tokens = generated_answer.lower().split()
+        
+        if not generated_tokens:
+            return 0.0
+        
+        # Calculate BLEU score for each reference answer and take the maximum
+        smoothing = SmoothingFunction().method1
+        max_bleu = 0.0
+        
+        for ref_answer in reference_answers:
+            if not ref_answer.strip():
+                continue
+            reference_tokens = ref_answer.lower().split()
+            if not reference_tokens:
+                continue
+            
+            # Calculate BLEU score with smoothing to handle cases where n-grams don't match
+            bleu = sentence_bleu(
+                [reference_tokens],
+                generated_tokens,
+                smoothing_function=smoothing
+            )
+            max_bleu = max(max_bleu, bleu)
+        
+        return max_bleu if max_bleu > 0.0 else None
+    except Exception as exc:
+        logging.warning("Failed to calculate BLEU score: %s", exc)
+        return None
 
 
 def iter_article_questions(dataset_split: Sequence[Dict[str, Any]]) -> Iterable[Tuple[str, Dict[str, Any], List[Dict[str, Any]]]]:
@@ -358,6 +582,10 @@ def main() -> None:
             logger.info("Q%d: %s", total_questions, question_text)
             _, answer, retrieved_metadata = rag_system.query(question_text, k=args.retrieval_k)
             reference_answers = extract_reference_answers(example.get("answers"))
+            bleu_score = calculate_bleu_score(answer, reference_answers)
+            exact_match = calculate_exact_match(answer, reference_answers)
+            f1_score = calculate_f1_score(answer, reference_answers)
+            rouge_l_score = calculate_rouge_l_score(answer, reference_answers)
 
             print("=" * 120)
             print(f"Article ID: {article_id}")
@@ -370,6 +598,16 @@ def main() -> None:
                 print("\nReference Answers:")
                 for ref_idx, ref_answer in enumerate(reference_answers, start=1):
                     print(f"  [{ref_idx}] {ref_answer}")
+            
+            print("\nScores:")
+            if exact_match is not None:
+                print(f"  Exact Match: {exact_match:.4f}")
+            if f1_score is not None:
+                print(f"  F1 Score: {f1_score:.4f}")
+            if rouge_l_score is not None:
+                print(f"  ROUGE-L Score: {rouge_l_score:.4f}")
+            if bleu_score is not None:
+                print(f"  BLEU Score: {bleu_score:.4f}")
 
             if args.show_context and retrieved_metadata:
                 print("\nRetrieved Context:")
@@ -390,6 +628,10 @@ def main() -> None:
                     "reference_answers": reference_answers,
                     "retrieved_context": retrieved_metadata if args.show_context else [],
                     "generator": "chatgpt5" if use_chatgpt5 else args.generator_model,
+                    "bleu_score": bleu_score,
+                    "exact_match": exact_match,
+                    "f1_score": f1_score,
+                    "rouge_l_score": rouge_l_score,
                 }
             )
             write_results()
