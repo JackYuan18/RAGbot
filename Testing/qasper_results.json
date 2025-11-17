@@ -1,204 +1,56 @@
 [
   {
-    "article_id": "1912.01214",
-    "title": "Cross-lingual Pre-training Based Transfer for Zero-shot Neural Machine Translation",
-    "question": "which multilingual approaches do they compare with?",
-    "generated_answer": "TABREF18 :: Setup We evaluate our cross-lingual pre-training based transfer approach against several strong baselines on two public datatsets, Europarl BIBREF31 and MultiUN BIBREF32 . we use four languages: English (En) is set as the pivot language, which has parallel data with other three languages which do not have parallel data between each other .\n\n*Generated using Local T5-Small*",
-    "reference_answers": [
-      "BIBREF19",
-      "BIBREF20",
-      "multilingual NMT (MNMT) BIBREF19"
-    ],
-    "retrieved_context": [],
-    "generator": "t5-small",
-    "dataset": "qasper",
-    "bleu_score": null,
-    "exact_match": 0.0,
-    "f1_score": null,
-    "rouge_l_score": null
-  },
-  {
-    "article_id": "1912.01214",
-    "title": "Cross-lingual Pre-training Based Transfer for Zero-shot Neural Machine Translation",
-    "question": "what are the pivot-based baselines?",
-    "generated_answer": ":: Main Results ::: Results on Europarl Dataset. What are the pivot-based baselines? Context: Experiments::: Main Results ::: Results on Europarl Dataset. What are the pivot-based baselines? Context: Experiments::: Main Results ::: Results on Europarl Dataset. What are the pivot-based baselines?\n\n*Generated using Local T5-Small*",
-    "reference_answers": [
-      "pivoting",
-      "pivoting$_{\\rm m}$",
-      "firstly translates a source language into the pivot language which is later translated to the target language"
-    ],
-    "retrieved_context": [],
-    "generator": "t5-small",
-    "dataset": "qasper",
-    "bleu_score": 0.004863083928997274,
-    "exact_match": 0.0,
-    "f1_score": 0.0625,
-    "rouge_l_score": 0.07023603914795624
-  },
-  {
-    "article_id": "1912.01214",
-    "title": "Cross-lingual Pre-training Based Transfer for Zero-shot Neural Machine Translation",
-    "question": "which datasets did they experiment with?",
-    "generated_answer": ":: Main Results ::: Results on Europarl Dataset. We evaluate on French-English-Spanish (Fr-En-Es), German-English-French (De-En-Fr) and Romanian-English-German (Ro-En-De) where English acts as the pivot language, its left side is the source language, and its right side is the target language . We remove the multi-parallel sentences between different training corpora to ensure zero-shot settings\n\n*Generated using Local T5-Small*",
-    "reference_answers": [
-      "Europarl",
-      "MultiUN",
-      "Europarl BIBREF31",
-      "MultiUN BIBREF32"
-    ],
-    "retrieved_context": [],
-    "generator": "t5-small",
-    "dataset": "qasper",
-    "bleu_score": 0.003148013662646501,
-    "exact_match": 0.0,
-    "f1_score": 0.04166666666666667,
-    "rouge_l_score": 0.041049798115746966
-  },
-  {
-    "article_id": "0029bdbe75423337b551e42bb31f9a102785376f",
+    "article_id": "covid_6",
     "title": "Unknown title",
-    "question": "Who is Miss Delmer?",
-    "generated_answer": "Percival is a young teenager, and is promoted to captain . he is able to convince the captain to spare the lives of a wealthy Dutch merchant and his young daughter .\n\n*Generated using Local T5-Small*",
+    "question": "Summarize the whole meeting.",
+    "generated_answer": "Speaker: The Chair I call this meeting to order. Welcome to the 12th meeting of the House of Commons Special Committee on the COVID-19 Pandemic . Speaker: The Chair We are now going to suspend the proceedings for a few seconds to allow the employees who provide support for the meeting to replace each other safely .\n\n*Generated using Local T5-Small*",
     "reference_answers": [
-      "the elderly spinster aunt of the Earl de Verseley and Captain Delmar",
-      "She's Captail Delmar's aunt."
+      "The meeting basically discussed the crisis across Canada amidst the pandemic. The opposition party questioned the ministers for responding late to the situation, and the financial support was not given to those who were really in need. The ministers promised that they were trying to reach out to as many companies as possible and the opposition party was not very satisfied with the answer. Canada's economy was heavily stricken by the pandemic and the opposition party was prompting the ministers to roll out several measures. Last but not least, they stressed on the long-term care issue, and the ministers promised that they were paying attention to it."
     ],
     "retrieved_context": [],
     "generator": "t5-small",
-    "dataset": "narrativeqa",
-    "bleu_score": 0.007711727065811939,
+    "dataset": "qmsum",
+    "total_questions_in_dataset": 544,
+    "total_questions_available": 3,
+    "bleu_score": 0.006871122390964353,
     "exact_match": 0.0,
-    "f1_score": 0.21621621621621623,
-    "rouge_l_score": 0.13738738738738737
+    "f1_score": 0.14814814814814814,
+    "rouge_l_score": 0.15882462339594566
   },
   {
-    "article_id": "0029bdbe75423337b551e42bb31f9a102785376f",
+    "article_id": "covid_6",
     "title": "Unknown title",
-    "question": "Who does Arabella Mason wed?",
-    "generated_answer": "Arabella Mason, the daughter of a deceased, well-liked steward, is a guest . Percival is able to convince the captain to spare the lives of a wealthy Dutch merchant and his young daughter, Minnie .\n\n*Generated using Local T5-Small*",
+    "question": "How did the Prime Minister debate about the delaying of the government's response towards Covid-19?",
+    "generated_answer": "True\n\n*Generated using Local T5-Small*",
     "reference_answers": [
-      "Ben Keene, Delmar's valet",
-      "Ben Keene"
+      "In response to the opposition party, the Prime Minister answered that the government rolled out the Canada emergency response benefit extremely quickly, and they had been helping the small businesses with the Canada emergency business account. The opposition party was not very satisfied because he thought that the government did not reach out to as many businesses as possible. Also, the opposition party made a few comments on the rent relief program which was too rigid and hard to apply."
     ],
     "retrieved_context": [],
     "generator": "t5-small",
-    "dataset": "narrativeqa",
+    "dataset": "qmsum",
+    "total_questions_in_dataset": 544,
+    "total_questions_available": 3,
     "bleu_score": null,
     "exact_match": 0.0,
     "f1_score": null,
     "rouge_l_score": null
   },
   {
-    "article_id": "0029bdbe75423337b551e42bb31f9a102785376f",
+    "article_id": "covid_6",
     "title": "Unknown title",
-    "question": "How does Percival Keene get his name?",
-    "generated_answer": "Percival is a young teenager, and is able to convince his fellow shipman of his true identity . he is captured during a pirate raid along with others, and is taken as a prisoner .\n\n*Generated using Local T5-Small*",
+    "question": "What did the opposition party and the Prime Minister commented about companies laying off workers in the midst of pandemic?",
+    "generated_answer": "True\n\n*Generated using Local T5-Small*",
     "reference_answers": [
-      "Percival is Captain Delmar's first name, and Keene is Ben's last name",
-      "Captain's name and Ben's surname"
+      "The Prime Minister explained that the government recognized that several organizations and companies were facing difficulties because of COVID-19 and they were supporting people all over the country through that program. Although the opposition party was getting rigorous about the intensity of the question, the Prime Minister kept emphasizing that the government's priority had always been workers in difficulty so that they do not lose their jobs. This applied to all organizations and companies in the country to the extent possible."
     ],
     "retrieved_context": [],
     "generator": "t5-small",
-    "dataset": "narrativeqa",
-    "bleu_score": 0.011931001236437418,
-    "exact_match": 0.0,
-    "f1_score": 0.14285714285714285,
-    "rouge_l_score": 0.1734186211798152
-  },
-  {
-    "article_id": "52845",
-    "title": "The Girl in His Mind",
-    "question": "How much time has passed between Blake's night with Eldoria and his search for Sabrina York in his mind-world?",
-    "generated_answer": "Sabrina York: \"No, not yet. I'll walk back to the sorority house with you\"\n\n*Generated using Local T5-Small*",
-    "reference_answers": [
-      "10 hours"
-    ],
-    "retrieved_context": [],
-    "generator": "t5-small",
-    "dataset": "quality",
+    "dataset": "qmsum",
+    "total_questions_in_dataset": 544,
+    "total_questions_available": 3,
     "bleu_score": null,
     "exact_match": 0.0,
     "f1_score": null,
     "rouge_l_score": null
-  },
-  {
-    "article_id": "52845",
-    "title": "The Girl in His Mind",
-    "question": "Why does Deirdre get so upset when Blake Past suggests she go to prom with the young man?",
-    "generated_answer": "Blake Past stood up too. \"No, not yet. I'll walk back to the sorority house with you.\" Blake Present watched them set out side by side toward the remembered halls of learning that showed in distance .\n\n*Generated using Local T5-Small*",
-    "reference_answers": [
-      "Because Deirdre has fallen in love with Blake, despite his age, and wants him to take her to the prom."
-    ],
-    "retrieved_context": [],
-    "generator": "t5-small",
-    "dataset": "quality",
-    "bleu_score": 0.011326402345230238,
-    "exact_match": 0.0,
-    "f1_score": 0.14035087719298245,
-    "rouge_l_score": 0.06991404011461319
-  },
-  {
-    "article_id": "52845",
-    "title": "The Girl in His Mind",
-    "question": "Why does shame flame in Blake's cheeks when Deirdre goes to prepare Eldoria's dias?",
-    "generated_answer": "Shame flamed in Blake's cheeks, and for a moment he considered leaving . \"Eldoria will be arriving soon. I must go and prepare her dais,\" he said .\n\n*Generated using Local T5-Small*",
-    "reference_answers": [
-      "He feels guilty about sleeping with Eldoria when there's a child in the hut, Deirdre, who knows exactly what's going on."
-    ],
-    "retrieved_context": [],
-    "generator": "t5-small",
-    "dataset": "quality",
-    "bleu_score": 0.007678432706586176,
-    "exact_match": 0.0,
-    "f1_score": 0.12000000000000001,
-    "rouge_l_score": 0.03920308483290488
-  },
-  {
-    "article_id": "52845",
-    "title": "The Girl in His Mind",
-    "question": "How much time has passed between Blake's night with Eldoria and his search for Sabrina York in his mind-world?",
-    "generated_answer": "Sabrina York: \"No, not yet. I'll walk back to the sorority house with you\"\n\n*Generated using Local T5-Small*",
-    "reference_answers": [
-      "10 hours"
-    ],
-    "retrieved_context": [],
-    "generator": "t5-small",
-    "dataset": "quality",
-    "bleu_score": null,
-    "exact_match": 0.0,
-    "f1_score": null,
-    "rouge_l_score": null
-  },
-  {
-    "article_id": "52845",
-    "title": "The Girl in His Mind",
-    "question": "Why does Deirdre get so upset when Blake Past suggests she go to prom with the young man?",
-    "generated_answer": "Blake Past stood up too. \"No, not yet. I'll walk back to the sorority house with you.\" Blake Present watched them set out side by side toward the remembered halls of learning that showed in distance .\n\n*Generated using Local T5-Small*",
-    "reference_answers": [
-      "Because Deirdre has fallen in love with Blake, despite his age, and wants him to take her to the prom."
-    ],
-    "retrieved_context": [],
-    "generator": "t5-small",
-    "dataset": "quality",
-    "bleu_score": 0.011326402345230238,
-    "exact_match": 0.0,
-    "f1_score": 0.14035087719298245,
-    "rouge_l_score": 0.06991404011461319
-  },
-  {
-    "article_id": "52845",
-    "title": "The Girl in His Mind",
-    "question": "Why does shame flame in Blake's cheeks when Deirdre goes to prepare Eldoria's dias?",
-    "generated_answer": "Shame flamed in Blake's cheeks, and for a moment he considered leaving . \"Eldoria will be arriving soon. I must go and prepare her dais,\" he said .\n\n*Generated using Local T5-Small*",
-    "reference_answers": [
-      "He feels guilty about sleeping with Eldoria when there's a child in the hut, Deirdre, who knows exactly what's going on."
-    ],
-    "retrieved_context": [],
-    "generator": "t5-small",
-    "dataset": "quality",
-    "bleu_score": 0.007678432706586176,
-    "exact_match": 0.0,
-    "f1_score": 0.12000000000000001,
-    "rouge_l_score": 0.03920308483290488
   }
 ]

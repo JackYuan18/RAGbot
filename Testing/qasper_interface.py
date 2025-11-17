@@ -326,9 +326,19 @@ def calculate_dataset_statistics(results: List[Dict[str, Any]]) -> Dict[str, Dic
                     except (TypeError, ValueError):
                         pass
         
+        # Calculate total questions in dataset and available (from first result's metadata, all should have same value)
+        total_questions_in_dataset = None
+        total_questions_available = None
+        if dataset_results:
+            first_result = dataset_results[0]
+            total_questions_in_dataset = first_result.get("total_questions_in_dataset")
+            total_questions_available = first_result.get("total_questions_available")
+        
         # Calculate statistics for each metric
         stats: Dict[str, Any] = {
             "count": len(dataset_results),
+            "total_questions_in_dataset": total_questions_in_dataset,
+            "total_questions_available": total_questions_available,
             "metrics": {}
         }
         
@@ -892,7 +902,29 @@ TEMPLATE = """
 
         const title = document.createElement('div');
         title.className = 'tab-title';
-        title.textContent = datasetLabel + ' (' + stats.count + ' questions)';
+        let titleText = datasetLabel;
+        const questionsTested = stats.count || 0;
+        const questionsAvailable = stats.total_questions_available;
+        const questionsInDataset = stats.total_questions_in_dataset;
+        
+        // Build title with question counts
+        let countText = '';
+        if (questionsInDataset !== null && questionsInDataset !== undefined) {
+          // Show: "X of Y tested (Z total in dataset)"
+          if (questionsAvailable !== null && questionsAvailable !== undefined) {
+            countText = questionsTested + ' of ' + questionsAvailable + ' tested (' + questionsInDataset + ' total in dataset)';
+          } else {
+            countText = questionsTested + ' tested (' + questionsInDataset + ' total in dataset)';
+          }
+        } else if (questionsAvailable !== null && questionsAvailable !== undefined) {
+          // Fallback: show available if we don't have total in dataset
+          countText = questionsTested + ' of ' + questionsAvailable + ' tested';
+        } else {
+          // Last fallback: just show tested
+          countText = questionsTested + ' questions tested';
+        }
+        titleText += ' (' + countText + ')';
+        title.textContent = titleText;
 
         const toggle = document.createElement('span');
         toggle.className = 'tab-toggle';
@@ -1332,7 +1364,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="0.0.0.0", help="Interface host.")
     parser.add_argument("--port", type=int, default=5051, help="Interface port.")
     parser.add_argument("--run-on-start", action="store_true", help="Run the test suite automatically at startup.")
-    parser.add_argument("--open-browser", action="store_true", help="Open the interface in the default browser.")
+    parser.add_argument("--no-open-browser", dest="open_browser", action="store_false", help="Do not open the interface in the default browser.")
+    parser.set_defaults(open_browser=True)
     return parser.parse_args()
 
 
