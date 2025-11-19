@@ -310,6 +310,7 @@ def calculate_dataset_statistics(results: List[Dict[str, Any]]) -> Dict[str, Dic
         metrics = {
             "exact_match": [],
             "f1_score": [],
+            "recall_score": [],
             "rouge_l_score": [],
             "bleu_score": [],
         }
@@ -483,6 +484,18 @@ TEMPLATE = """
           <input type="checkbox" id="input-dataset-musique" name="datasets" value="musique" class="dataset-checkbox" {% if config.dataset == 'musique' or (config.datasets and 'musique' in config.datasets) %}checked{% endif %}>
           <span>MuSiQue</span>
         </label>
+        <label style="flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer;">
+          <input type="checkbox" id="input-dataset-xsum" name="datasets" value="xsum" class="dataset-checkbox" {% if config.dataset == 'xsum' or (config.datasets and 'xsum' in config.datasets) %}checked{% endif %}>
+          <span>XSum</span>
+        </label>
+        <label style="flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer;">
+          <input type="checkbox" id="input-dataset-wikiasp" name="datasets" value="wikiasp" class="dataset-checkbox" {% if config.dataset == 'wikiasp' or (config.datasets and 'wikiasp' in config.datasets) %}checked{% endif %}>
+          <span>WikiAsp</span>
+        </label>
+        <label style="flex-direction: row; align-items: center; gap: 0.5rem; cursor: pointer;">
+          <input type="checkbox" id="input-dataset-longbench" name="datasets" value="longbench" class="dataset-checkbox" {% if config.dataset == 'longbench' or (config.datasets and 'longbench' in config.datasets) %}checked{% endif %}>
+          <span>LongBench</span>
+        </label>
       </div>
     </label>
     <label for="input-generator_model">
@@ -565,6 +578,9 @@ TEMPLATE = """
           if (d === 'quality') return 'QuALITY';
           if (d === 'hotpot') return 'HotpotQA';
           if (d === 'musique') return 'MuSiQue';
+          if (d === 'xsum') return 'XSum';
+          if (d === 'wikiasp') return 'WikiAsp';
+          if (d === 'longbench') return 'LongBench';
           return d;
         }).join(', ') || 'None';
         target.textContent = displayText;
@@ -629,6 +645,12 @@ TEMPLATE = """
               displayValue = 'HotpotQA';
             } else if (displayValue === 'musique') {
               displayValue = 'MuSiQue';
+            } else if (displayValue === 'xsum') {
+              displayValue = 'XSum';
+            } else if (displayValue === 'wikiasp') {
+              displayValue = 'WikiAsp';
+            } else if (displayValue === 'longbench') {
+              displayValue = 'LongBench';
             }
           }
         }
@@ -814,6 +836,9 @@ TEMPLATE = """
       if (item.f1_score !== null && item.f1_score !== undefined) {
         scoreParts.push('<strong>F1:</strong> ' + formatMetricValue(item.f1_score));
       }
+      if (item.recall_score !== null && item.recall_score !== undefined) {
+        scoreParts.push('<strong>Recall:</strong> ' + formatMetricValue(item.recall_score));
+      }
       if (item.rouge_l_score !== null && item.rouge_l_score !== undefined) {
         scoreParts.push('<strong>R-L:</strong> ' + formatMetricValue(item.rouge_l_score));
       }
@@ -887,7 +912,10 @@ TEMPLATE = """
           'narrativeqa': 'NarrativeQA',
           'quality': 'QuALITY',
           'hotpot': 'HotpotQA',
-          'musique': 'MuSiQue'
+          'musique': 'MuSiQue',
+          'xsum': 'XSum',
+          'wikiasp': 'WikiAsp',
+          'longbench': 'LongBench'
         }[dataset] || dataset;
 
         const tab = document.createElement('div');
@@ -939,6 +967,7 @@ TEMPLATE = """
         const metrics = [
           { key: 'exact_match', label: 'EM' },
           { key: 'f1_score', label: 'F1' },
+          { key: 'recall_score', label: 'Recall' },
           { key: 'rouge_l_score', label: 'ROUGE-L' },
           { key: 'bleu_score', label: 'BLEU' }
         ];
@@ -1296,7 +1325,7 @@ def trigger_run():
     if "datasets" in payload and isinstance(payload["datasets"], list) and payload["datasets"]:
         # Multiple datasets
         datasets = [str(d).strip().lower() for d in payload["datasets"]]
-        valid_datasets = [d for d in datasets if d in ("qasper", "qmsum", "narrativeqa", "quality", "hotpot", "musique")]
+        valid_datasets = [d for d in datasets if d in ("qasper", "qmsum", "narrativeqa", "quality", "hotpot", "musique", "xsum", "wikiasp", "longbench")]
         if valid_datasets:
             if len(valid_datasets) == 1:
                 # Single dataset - use legacy field for compatibility
@@ -1310,7 +1339,7 @@ def trigger_run():
     elif "dataset" in payload and payload["dataset"]:
         # Single dataset (legacy support)
         options_dict["dataset"] = str(payload["dataset"]).strip().lower()
-        if options_dict["dataset"] not in ("qasper", "qmsum", "narrativeqa", "quality", "hotpot", "musique"):
+        if options_dict["dataset"] not in ("qasper", "qmsum", "narrativeqa", "quality", "hotpot", "musique", "xsum", "wikiasp", "longbench"):
             options_dict["dataset"] = "qasper"
 
     generator_value = str(options_dict.get("generator_model", TEST_OPTIONS.generator_model or "t5-small")).lower()
@@ -1358,7 +1387,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--show-context", dest="show_context", action="store_true", help="Display retrieved context in outputs.")
     parser.add_argument("--hide-context", dest="show_context", action="store_false", help="Hide retrieved context in outputs.")
     parser.set_defaults(show_context=False)
-    parser.add_argument("--dataset", choices=["qasper", "qmsum", "narrativeqa", "quality", "hotpot", "musique"], default="qasper", help="Dataset to use: 'qasper', 'qmsum', 'narrativeqa', 'quality', 'hotpot', or 'musique'.")
+    parser.add_argument("--dataset", choices=["qasper", "qmsum", "narrativeqa", "quality", "hotpot", "musique", "xsum", "wikiasp", "longbench"], default="qasper", help="Dataset to use: 'qasper', 'qmsum', 'narrativeqa', 'quality', 'hotpot', 'musique', 'xsum', 'wikiasp', or 'longbench'.")
     parser.add_argument("--log-level", default="INFO", help="Log level passed to the test script.")
     parser.add_argument("--results-path", default=str(DEFAULT_RESULTS_PATH), help="Where to write the results JSON.")
     parser.add_argument("--host", default="0.0.0.0", help="Interface host.")

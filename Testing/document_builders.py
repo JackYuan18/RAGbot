@@ -261,6 +261,132 @@ def build_musique_documents(
     return documents, doc_metadata
 
 
+def build_xsum_documents(
+    rag_system: RAGSystem,
+    article_id: str,
+    record: Dict[str, Any],
+    chunk_size: int,
+) -> Tuple[List[str], List[Dict[str, Any]]]:
+    """Build documents from XSum article."""
+    documents: List[str] = []
+    doc_metadata: List[Dict[str, Any]] = []
+    title = record.get("title") or f"XSum {article_id}"
+    add_text_block = _create_text_adder(rag_system, article_id, chunk_size, title, record, documents, doc_metadata)
+    
+    document_text = record.get("document") or record.get("article") or ""
+    
+    if document_text:
+        # Split document into paragraphs
+        paragraphs = document_text.split("\n\n") or [document_text]
+        for para_idx, para in enumerate(paragraphs):
+            if para.strip():
+                add_text_block(para.strip(), None, para_idx)
+    
+    if not documents:
+        logging.warning("No textual content extracted for XSum entry %s", article_id)
+    
+    return documents, doc_metadata
+
+
+def build_wikiasp_documents(
+    rag_system: RAGSystem,
+    article_id: str,
+    record: Dict[str, Any],
+    chunk_size: int,
+) -> Tuple[List[str], List[Dict[str, Any]]]:
+    """Build documents from WikiAsp article.
+    
+    WikiAsp format:
+    - "exid": example ID
+    - "inputs": list of text chunks (article content)
+    - "targets": list of [aspect_name, summary_text] pairs
+    - "topic": topic name (added by loader, e.g., "Album", "Animal")
+    """
+    documents: List[str] = []
+    doc_metadata: List[Dict[str, Any]] = []
+    
+    # Get topic from record (added by loader)
+    topic = record.get("topic", "WikiAsp")
+    title = f"{topic} {article_id}"
+    add_text_block = _create_text_adder(rag_system, article_id, chunk_size, title, record, documents, doc_metadata)
+    
+    # WikiAsp uses "inputs" field which is a list of text chunks
+    inputs = record.get("inputs") or []
+    
+    if isinstance(inputs, list):
+        # Process each input chunk
+        for input_idx, input_chunk in enumerate(inputs):
+            if input_chunk and str(input_chunk).strip():
+                # Remove < EOT > marker if present
+                text = str(input_chunk).strip()
+                text = text.replace("< EOT >", "").strip()
+                if text:
+                    add_text_block(text, None, input_idx)
+    
+    # Fallback: try old format fields if inputs not found
+    if not documents:
+        main_text = record.get("text") or record.get("article_text") or record.get("content") or ""
+        if main_text:
+            paragraphs = main_text.split("\n\n") if isinstance(main_text, str) else [main_text]
+            for para_idx, para in enumerate(paragraphs):
+                if para and str(para).strip():
+                    add_text_block(str(para).strip(), None, para_idx)
+        
+        # Also check for reference documents
+        references = record.get("references") or record.get("cited_references") or record.get("documents") or []
+        if isinstance(references, list):
+            for ref_idx, ref in enumerate(references):
+                if isinstance(ref, dict):
+                    ref_text = ref.get("text") or ref.get("content") or ref.get("document") or ""
+                    ref_title = ref.get("title") or ref.get("name") or f"Reference {ref_idx + 1}"
+                    if ref_text:
+                        paragraphs = ref_text.split("\n\n") if isinstance(ref_text, str) else [ref_text]
+                        for para_idx, para in enumerate(paragraphs):
+                            if para and str(para).strip():
+                                add_text_block(str(para).strip(), ref_title, para_idx)
+                elif isinstance(ref, str) and ref.strip():
+                    add_text_block(ref.strip(), f"Reference {ref_idx + 1}", ref_idx)
+    
+    if not documents:
+        logging.warning("No textual content extracted for WikiAsp entry %s", article_id)
+    
+    return documents, doc_metadata
+
+
+def build_longbench_documents(
+    rag_system: RAGSystem,
+    article_id: str,
+    record: Dict[str, Any],
+    chunk_size: int,
+) -> Tuple[List[str], List[Dict[str, Any]]]:
+    """Build documents from LongBench entry.
+    
+    LongBench format:
+    - context: The long context document(s) required for the task
+    - dataset: Name of the sub-dataset (e.g., "narrativeqa", "qasper", etc.)
+    """
+    documents: List[str] = []
+    doc_metadata: List[Dict[str, Any]] = []
+    sub_dataset = record.get("dataset") or "LongBench"
+    title = f"LongBench {sub_dataset} {article_id}"
+    add_text_block = _create_text_adder(rag_system, article_id, chunk_size, title, record, documents, doc_metadata)
+    
+    # LongBench context contains the long document(s) needed for the task
+    context = record.get("context") or ""
+    
+    if context:
+        # Split context into paragraphs
+        paragraphs = context.split("\n\n") if isinstance(context, str) else [context]
+        for para_idx, para in enumerate(paragraphs):
+            if para and str(para).strip():
+                add_text_block(str(para).strip(), None, para_idx)
+    
+    if not documents:
+        logging.warning("No textual content extracted for LongBench entry %s", article_id)
+    
+    return documents, doc_metadata
+
+
 def build_qasper_documents(
     rag_system: RAGSystem,
     article_id: str,
@@ -338,6 +464,9 @@ def build_article_documents(
         "quality": build_quality_documents,
         "hotpot": build_hotpot_documents,
         "musique": build_musique_documents,
+        "xsum": build_xsum_documents,
+        "wikiasp": build_wikiasp_documents,
+        "longbench": build_longbench_documents,
     }
     
     builder_func = builders.get(dataset_lower, build_qasper_documents)

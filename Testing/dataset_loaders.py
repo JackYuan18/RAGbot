@@ -274,6 +274,151 @@ def load_musique_from_local(split: str, dataset_dir: Path) -> List[Dict[str, Any
     return records
 
 
+def load_xsum_from_local(split: str, dataset_dir: Path) -> List[Dict[str, Any]]:
+    """Load XSum dataset from local JSON files or JSONL files."""
+    split_map = {"validation": "validation", "train": "train", "test": "test", "dev": "validation"}
+    split_name = split_map.get(split.lower(), split.lower())
+    
+    data_dir = dataset_dir / "data" if (dataset_dir / "data").exists() else dataset_dir
+    records: List[Dict[str, Any]] = []
+    
+    filename_patterns = [
+        f"xsum.{split_name}.jsonl",
+        f"xsum_{split_name}.jsonl",
+        f"{split_name}.jsonl",
+        f"xsum.{split_name}.json",
+        f"xsum_{split_name}.json",
+        f"{split_name}.json",
+    ]
+    
+    for filename_pattern in filename_patterns:
+        file_path = data_dir / filename_pattern
+        if file_path.exists():
+            logging.info("Found XSum file: %s", file_path)
+            if file_path.suffix == ".jsonl":
+                records = _load_jsonl_file(file_path)
+            else:
+                records = _load_json_file(file_path)
+            if records:
+                break
+    
+    if not records:
+        raise FileNotFoundError(f"No XSum records found in {dataset_dir} or {data_dir}. Tried splits: {split_name}")
+    
+    logging.info("Loaded %d XSum records from local directory", len(records))
+    return records
+
+
+def load_wikiasp_from_local(split: str, dataset_dir: Path) -> List[Dict[str, Any]]:
+    """Load WikiAsp dataset from local JSON files or JSONL files.
+    
+    WikiAsp has multiple topic folders (Album, Animal, Artist, Building, etc.)
+    Each folder contains train.jsonl, test.jsonl, and valid.jsonl files.
+    """
+    # WikiAsp uses "valid" for validation, not "dev"
+    split_map = {"validation": "valid", "train": "train", "test": "test", "dev": "valid", "valid": "valid"}
+    split_name = split_map.get(split.lower(), split.lower())
+    
+    # WikiAsp has domain-specific subdirectories in the data folder
+    data_dir = dataset_dir / "data" if (dataset_dir / "data").exists() else dataset_dir
+    records: List[Dict[str, Any]] = []
+    
+    # Try common filename patterns in root data directory first (fallback)
+    filename_patterns = [
+        f"wikiasp.{split_name}.jsonl",
+        f"wikiasp_{split_name}.jsonl",
+        f"{split_name}.jsonl",
+        f"wikiasp.{split_name}.json",
+        f"wikiasp_{split_name}.json",
+        f"{split_name}.json",
+    ]
+    
+    for filename_pattern in filename_patterns:
+        file_path = data_dir / filename_pattern
+        if file_path.exists():
+            logging.info("Found WikiAsp file: %s", file_path)
+            if file_path.suffix == ".jsonl":
+                records = _load_jsonl_file(file_path)
+            else:
+                records = _load_json_file(file_path)
+            if records:
+                break
+    
+    # Load from all topic subdirectories (WikiAsp has multiple topics like Album, Animal, Artist, etc.)
+    if not records:
+        topic_dirs = [d for d in data_dir.iterdir() if d.is_dir() and not d.name.startswith('.')]
+        if topic_dirs:
+            logging.info("Found %d topic directories in WikiAsp data folder", len(topic_dirs))
+            for topic_dir in sorted(topic_dirs):
+                # Look for split file in this topic directory
+                topic_file = topic_dir / f"{split_name}.jsonl"
+                if topic_file.exists():
+                    logging.info("Loading WikiAsp records from topic %s: %s", topic_dir.name, topic_file)
+                    try:
+                        topic_records = _load_jsonl_file(topic_file)
+                        if topic_records:
+                            # Add topic information to each record
+                            for record in topic_records:
+                                record['topic'] = topic_dir.name
+                            records.extend(topic_records)
+                            logging.info("Loaded %d records from topic %s (total: %d)", 
+                                       len(topic_records), topic_dir.name, len(records))
+                    except Exception as exc:
+                        logging.warning("Failed to load WikiAsp file from topic %s: %s", topic_dir.name, exc)
+    
+    if not records:
+        raise FileNotFoundError(f"No WikiAsp records found in {dataset_dir} or {data_dir}. Tried splits: {split_name}")
+    
+    logging.info("Loaded %d total WikiAsp records from %d topic(s)", len(records), 
+                len(set(r.get('topic', 'unknown') for r in records)))
+    return records
+
+
+def load_longbench_from_local(split: str, dataset_dir: Path) -> List[Dict[str, Any]]:
+    """Load LongBench dataset from local JSONL files.
+    
+    LongBench has multiple sub-datasets. This function loads all available JSONL files
+    from the data directory or combines them into a single list.
+    """
+    split_map = {"validation": "test", "train": "train", "test": "test", "dev": "test"}
+    split_name = split_map.get(split.lower(), "test")
+    
+    # LongBench data is typically in a data directory
+    data_dir = dataset_dir / "data" if (dataset_dir / "data").exists() else dataset_dir
+    records: List[Dict[str, Any]] = []
+    
+    # LongBench sub-datasets include:
+    # narrativeqa, qasper, multifieldqa_en, multifieldqa_zh, hotpotqa, 2wikimqa, musique,
+    # dureader, gov_report, qmsum, multi_news, vcsum, trec, triviaqa, samsum, lsht,
+    # passage_count, passage_retrieval_en, passage_retrieval_zh, lcc, repobench-p
+    # And their LongBench-E variants (_e suffix)
+    
+    if not data_dir.exists():
+        raise FileNotFoundError(f"LongBench data directory not found: {data_dir}")
+    
+    # Collect all JSONL files in the data directory
+    jsonl_files = list(data_dir.glob("*.jsonl"))
+    
+    if not jsonl_files:
+        raise FileNotFoundError(f"No JSONL files found in LongBench data directory: {data_dir}")
+    
+    # Load all sub-datasets (or you could filter by specific sub-dataset if needed)
+    for jsonl_file in sorted(jsonl_files):
+        try:
+            file_records = _load_jsonl_file(jsonl_file)
+            if file_records:
+                logging.info("Loaded %d records from LongBench sub-dataset: %s", len(file_records), jsonl_file.name)
+                records.extend(file_records)
+        except Exception as exc:
+            logging.warning("Failed to load LongBench file %s: %s", jsonl_file, exc)
+    
+    if not records:
+        raise FileNotFoundError(f"No LongBench records found in {data_dir}")
+    
+    logging.info("Loaded %d total LongBench records from local directory", len(records))
+    return records
+
+
 def load_dataset_with_fallback(
     dataset_name: str,
     split: str,

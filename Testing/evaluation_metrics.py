@@ -92,6 +92,42 @@ def calculate_exact_match(generated_answer: str, reference_answers: List[str]) -
         return None
 
 
+def calculate_recall_score(generated_answer: str, reference_answers: List[str]) -> Optional[float]:
+    """
+    Calculate Recall score (token-level) between generated answer and reference answers.
+    
+    Returns the maximum recall score across all reference answers, or None if
+    there are no reference answers.
+    
+    Recall = common_tokens / reference_tokens
+    This measures how many tokens from the reference answer are present in the generated answer.
+    """
+    if not reference_answers:
+        return None
+    
+    try:
+        generated_tokens = set(normalize_text(generated_answer).split())
+        if not generated_tokens:
+            return 0.0
+        
+        max_recall = 0.0
+        for ref_answer in reference_answers:
+            if not ref_answer.strip():
+                continue
+            reference_tokens = set(normalize_text(ref_answer).split())
+            if not reference_tokens:
+                continue
+            
+            common_tokens = generated_tokens & reference_tokens
+            recall = len(common_tokens) / len(reference_tokens) if reference_tokens else 0.0
+            max_recall = max(max_recall, recall)
+        
+        return max_recall if max_recall > 0.0 else 0.0
+    except Exception as exc:
+        logging.warning("Failed to calculate Recall score: %s", exc)
+        return None
+
+
 def calculate_f1_score(generated_answer: str, reference_answers: List[str]) -> Optional[float]:
     """
     Calculate F1 score (token-level) between generated answer and reference answers.

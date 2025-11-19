@@ -1,56 +1,104 @@
 [
   {
-    "article_id": "covid_6",
-    "title": "Unknown title",
-    "question": "Summarize the whole meeting.",
-    "generated_answer": "Speaker: The Chair I call this meeting to order. Welcome to the 12th meeting of the House of Commons Special Committee on the COVID-19 Pandemic . Speaker: The Chair We are now going to suspend the proceedings for a few seconds to allow the employees who provide support for the meeting to replace each other safely .\n\n*Generated using Local T5-Small*",
+    "article_id": "1912.01214",
+    "title": "Cross-lingual Pre-training Based Transfer for Zero-shot Neural Machine Translation",
+    "question": "which multilingual approaches do they compare with?",
+    "generated_answer": "TABREF18 :: Setup We evaluate our cross-lingual pre-training based transfer approach against several strong baselines on two public datatsets, Europarl BIBREF31 and MultiUN BIBREF32 . we use four languages: English (En) is set as the pivot language, which has parallel data with other three languages which do not have parallel data between each other .\n\n*Generated using Local T5-Small*",
     "reference_answers": [
-      "The meeting basically discussed the crisis across Canada amidst the pandemic. The opposition party questioned the ministers for responding late to the situation, and the financial support was not given to those who were really in need. The ministers promised that they were trying to reach out to as many companies as possible and the opposition party was not very satisfied with the answer. Canada's economy was heavily stricken by the pandemic and the opposition party was prompting the ministers to roll out several measures. Last but not least, they stressed on the long-term care issue, and the ministers promised that they were paying attention to it."
+      "BIBREF19",
+      "BIBREF20",
+      "multilingual NMT (MNMT) BIBREF19"
     ],
     "retrieved_context": [],
     "generator": "t5-small",
-    "dataset": "qmsum",
-    "total_questions_in_dataset": 544,
-    "total_questions_available": 3,
-    "bleu_score": 0.006871122390964353,
-    "exact_match": 0.0,
-    "f1_score": 0.14814814814814814,
-    "rouge_l_score": 0.15882462339594566
-  },
-  {
-    "article_id": "covid_6",
-    "title": "Unknown title",
-    "question": "How did the Prime Minister debate about the delaying of the government's response towards Covid-19?",
-    "generated_answer": "True\n\n*Generated using Local T5-Small*",
-    "reference_answers": [
-      "In response to the opposition party, the Prime Minister answered that the government rolled out the Canada emergency response benefit extremely quickly, and they had been helping the small businesses with the Canada emergency business account. The opposition party was not very satisfied because he thought that the government did not reach out to as many businesses as possible. Also, the opposition party made a few comments on the rent relief program which was too rigid and hard to apply."
-    ],
-    "retrieved_context": [],
-    "generator": "t5-small",
-    "dataset": "qmsum",
-    "total_questions_in_dataset": 544,
+    "dataset": "qasper",
+    "total_questions_in_dataset": 1005,
     "total_questions_available": 3,
     "bleu_score": null,
     "exact_match": 0.0,
     "f1_score": null,
+    "recall_score": 0.0,
     "rouge_l_score": null
   },
   {
-    "article_id": "covid_6",
-    "title": "Unknown title",
-    "question": "What did the opposition party and the Prime Minister commented about companies laying off workers in the midst of pandemic?",
-    "generated_answer": "True\n\n*Generated using Local T5-Small*",
+    "article_id": "1912.01214",
+    "title": "Cross-lingual Pre-training Based Transfer for Zero-shot Neural Machine Translation",
+    "question": "what are the pivot-based baselines?",
+    "generated_answer": ":: Main Results ::: Results on Europarl Dataset. What are the pivot-based baselines? Context: Experiments::: Main Results ::: Results on Europarl Dataset. What are the pivot-based baselines? Context: Experiments::: Main Results ::: Results on Europarl Dataset. What are the pivot-based baselines?\n\n*Generated using Local T5-Small*",
     "reference_answers": [
-      "The Prime Minister explained that the government recognized that several organizations and companies were facing difficulties because of COVID-19 and they were supporting people all over the country through that program. Although the opposition party was getting rigorous about the intensity of the question, the Prime Minister kept emphasizing that the government's priority had always been workers in difficulty so that they do not lose their jobs. This applied to all organizations and companies in the country to the extent possible."
+      "pivoting",
+      "pivoting$_{\\rm m}$",
+      "firstly translates a source language into the pivot language which is later translated to the target language"
     ],
     "retrieved_context": [],
     "generator": "t5-small",
-    "dataset": "qmsum",
-    "total_questions_in_dataset": 544,
+    "dataset": "qasper",
+    "total_questions_in_dataset": 1005,
     "total_questions_available": 3,
+    "bleu_score": 0.004863083928997274,
+    "exact_match": 0.0,
+    "f1_score": 0.0625,
+    "recall_score": 0.07142857142857142,
+    "rouge_l_score": 0.07023603914795624
+  },
+  {
+    "article_id": "1912.01214",
+    "title": "Cross-lingual Pre-training Based Transfer for Zero-shot Neural Machine Translation",
+    "question": "which datasets did they experiment with?",
+    "generated_answer": ":: Main Results ::: Results on Europarl Dataset. We evaluate on French-English-Spanish (Fr-En-Es), German-English-French (De-En-Fr) and Romanian-English-German (Ro-En-De) where English acts as the pivot language, its left side is the source language, and its right side is the target language . We remove the multi-parallel sentences between different training corpora to ensure zero-shot settings\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "Europarl",
+      "MultiUN",
+      "Europarl BIBREF31",
+      "MultiUN BIBREF32"
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small",
+    "dataset": "qasper",
+    "total_questions_in_dataset": 1005,
+    "total_questions_available": 3,
+    "bleu_score": 0.003148013662646501,
+    "exact_match": 0.0,
+    "f1_score": 0.04166666666666667,
+    "recall_score": 1.0,
+    "rouge_l_score": 0.041049798115746966
+  },
+  {
+    "article_id": "2hop__460946_294723",
+    "title": "Unknown title",
+    "question": "Who is the spouse of the Green performer?",
+    "generated_answer": "Green is the fourth studio album by British progressive rock musician Steve Hillage . Green is the fourth studio album by American jazz guitarist Grant Green .\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "Miquette Giraudy"
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small",
+    "dataset": "musique",
+    "total_questions_in_dataset": 2417,
+    "total_questions_available": 1,
     "bleu_score": null,
     "exact_match": 0.0,
     "f1_score": null,
+    "recall_score": 0.0,
     "rouge_l_score": null
+  },
+  {
+    "article_id": "10788325",
+    "title": "Unknown title",
+    "question": "Summarize this article.",
+    "generated_answer": "Richard George Adams was born on 9 May 1920 in newbury, Berkshire . he was a raditional Englishman with a love of the countryside . he was persuaded to write a book which had such a revolutionary impact on children's literature . he was unable to find anyone to publish it, but he struggled to find anyone to publish it .\n\n*Generated using Local T5-Small*",
+    "reference_answers": [
+      "Once upon a time there was a middle-aged civil servant who told his children a story about rabbits."
+    ],
+    "retrieved_context": [],
+    "generator": "t5-small",
+    "dataset": "xsum",
+    "total_questions_in_dataset": 211,
+    "total_questions_available": 1,
+    "bleu_score": 0.007043825775563812,
+    "exact_match": 0.0,
+    "f1_score": 0.06557377049180328,
+    "recall_score": 0.125,
+    "rouge_l_score": 0.10734711834579849
   }
 ]

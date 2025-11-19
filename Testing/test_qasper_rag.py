@@ -51,10 +51,13 @@ from RAGSystem import RAGConfig, RAGSystem, setup_logging  # type: ignore
 from dataset_loaders import (
     load_dataset_with_fallback,
     load_hotpot_from_local,
+    load_longbench_from_local,
     load_musique_from_local,
     load_narrativeqa_from_local,
     load_qmsum_from_local,
     load_quality_from_local,
+    load_wikiasp_from_local,
+    load_xsum_from_local,
 )
 from dataset_iterators import iter_article_questions
 from document_builders import build_article_documents
@@ -62,6 +65,7 @@ from evaluation_metrics import (
     calculate_bleu_score,
     calculate_exact_match,
     calculate_f1_score,
+    calculate_recall_score,
     calculate_rouge_l_score,
     extract_reference_answers,
 )
@@ -74,7 +78,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--dataset",
-        choices=["qasper", "qmsum", "narrativeqa", "quality", "hotpot", "musique"],
+        choices=["qasper", "qmsum", "narrativeqa", "quality", "hotpot", "musique", "xsum", "wikiasp", "longbench"],
         default="qasper",
         help="Dataset to use",
     )
@@ -181,6 +185,21 @@ def load_dataset_data(dataset_name: str, split: str) -> List[Dict[str, Any]]:
             "hf_name": None,
             "loader": load_musique_from_local,
         },
+        "xsum": {
+            "local_dir": CURRENT_DIR / "Datasets" / "xsum" ,
+            "hf_name": "xsum",
+            "loader": load_xsum_from_local,
+        },
+        "wikiasp": {
+            "local_dir": CURRENT_DIR / "Datasets" / "wikiasp",
+            "hf_name": None,
+            "loader": load_wikiasp_from_local,
+        },
+        "longbench": {
+            "local_dir": CURRENT_DIR / "Datasets" / "LongBench" / "data",
+            "hf_name": "THUDM/LongBench",
+            "loader": load_longbench_from_local,
+        },
     }
     
     config = dataset_configs.get(dataset_name_lower)
@@ -212,6 +231,7 @@ def print_results(
     retrieved_metadata: List[Dict[str, Any]],
     exact_match: Optional[float],
     f1_score: Optional[float],
+    recall_score: Optional[float],
     rouge_l_score: Optional[float],
     bleu_score: Optional[float],
     show_context: bool,
@@ -234,6 +254,8 @@ def print_results(
         print(f"  Exact Match: {exact_match:.4f}")
     if f1_score is not None:
         print(f"  F1 Score: {f1_score:.4f}")
+    if recall_score is not None:
+        print(f"  Recall Score: {recall_score:.4f}")
     if rouge_l_score is not None:
         print(f"  ROUGE-L Score: {rouge_l_score:.4f}")
     if bleu_score is not None:
@@ -263,6 +285,7 @@ def main() -> None:
     
     # Load dataset
     dataset_name = args.dataset.lower()
+    logger.info("Processing dataset: %s (split: %s)", dataset_name, args.split)
     dataset_split = load_dataset_data(dataset_name, args.split)
     logger.info("Loaded %d records from %s dataset", len(dataset_split), dataset_name)
     
@@ -298,7 +321,11 @@ def main() -> None:
             output_path = candidate.resolve()
         
         try:
-            logger.debug("Writing %d results to %s", len(collected_results), output_path)
+            logger.debug("Writing %d results to %s (dataset: %s)", len(collected_results), output_path, dataset_name)
+            # Ensure all results have the correct dataset name
+            for result in collected_results:
+                if "dataset" in result:
+                    result["dataset"] = dataset_name
             with output_path.open("w", encoding="utf-8") as f:
                 json.dump(collected_results, f, ensure_ascii=False, indent=2)
             logger.debug("Successfully wrote results to %s", output_path)
@@ -388,6 +415,9 @@ def main() -> None:
             rouge_l_score = calculate_rouge_l_score(answer, reference_answers)
             bleu_score = calculate_bleu_score(answer, reference_answers)
             
+            # Calculate recall score
+            recall_score = calculate_recall_score(answer, reference_answers)
+            
             # Print results
             print_results(
                 article_id=article_id,
@@ -398,28 +428,34 @@ def main() -> None:
                 retrieved_metadata=retrieved_metadata,
                 exact_match=exact_match,
                 f1_score=f1_score,
+                recall_score=recall_score,
                 rouge_l_score=rouge_l_score,
                 bleu_score=bleu_score,
                 show_context=args.show_context,
             )
             
-            # Store results
-            collected_results.append({
+            # Store results - ensure dataset_name is used (not record.get("dataset") which might be sub-dataset name)
+            result_entry = {
                 "article_id": article_id,
-                "title": record.get("title") or "Unknown title",
+                "title": record.get("title") or record.get("article_title") or "Unknown title",
                 "question": question_text,
                 "generated_answer": answer,
                 "reference_answers": reference_answers,
                 "retrieved_context": retrieved_metadata if args.show_context else [],
                 "generator": "chatgpt5" if use_chatgpt5 else args.generator_model,
-                "dataset": dataset_name,
+                "dataset": dataset_name,  # Use top-level dataset name, not sub-dataset from record
                 "total_questions_in_dataset": total_questions_in_dataset,  # Total questions in entire dataset
                 "total_questions_available": total_questions_available,  # Questions available based on config
                 "bleu_score": bleu_score,
                 "exact_match": exact_match,
                 "f1_score": f1_score,
+                "recall_score": recall_score,
                 "rouge_l_score": rouge_l_score,
-            })
+            }
+            # For LongBench, also store the sub-dataset name for reference
+            if dataset_name == "longbench" and record.get("dataset"):
+                result_entry["sub_dataset"] = record.get("dataset")
+            collected_results.append(result_entry)
             write_results()
         
         if questions_processed > 0:

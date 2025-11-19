@@ -199,6 +199,118 @@ def iter_musique_article_questions(dataset_split: Sequence[Dict[str, Any]]) -> I
     yield from _iter_single_qa_questions(dataset_split, ["question_id", "id", "_id"], "question")
 
 
+def iter_xsum_article_questions(dataset_split: Sequence[Dict[str, Any]]) -> Iterable[Tuple[str, Dict[str, Any], List[Dict[str, Any]]]]:
+    """Iterate over XSum dataset articles for summarization."""
+    for idx, example in enumerate(dataset_split):
+        article_id = example.get("id") or example.get("_id") or f"xsum-{idx}"
+        document = example.get("document") or example.get("article") or ""
+        summary = example.get("summary") or ""
+        
+        if not document:
+            logging.debug("No document found for XSum entry %s", article_id)
+            continue
+        
+        # For summarization, we use a generic question
+        # The reference answer is the summary
+        question_text = "Summarize this article."
+        answers = [summary] if summary else []
+        
+        yield article_id, example, [{"question": question_text, "answers": answers}]
+
+
+def iter_wikiasp_article_questions(dataset_split: Sequence[Dict[str, Any]]) -> Iterable[Tuple[str, Dict[str, Any], List[Dict[str, Any]]]]:
+    """Iterate over WikiAsp dataset articles and aspect-based questions.
+    
+    WikiAsp format:
+    - "exid": example ID
+    - "inputs": list of text chunks (article content)
+    - "targets": list of [aspect_name, summary_text] pairs
+    """
+    for idx, example in enumerate(dataset_split):
+        # Use exid if available, otherwise fall back to other ID fields
+        article_id = example.get("exid") or example.get("id") or example.get("article_id") or example.get("_id") or f"wikiasp-{idx}"
+        questions: List[Dict[str, Any]] = []
+        
+        # WikiAsp format: targets is a list of [aspect_name, summary_text] pairs
+        targets = example.get("targets") or []
+        
+        if isinstance(targets, list):
+            for target_item in targets:
+                if isinstance(target_item, list) and len(target_item) >= 2:
+                    # Format: [aspect_name, summary_text]
+                    aspect_name = target_item[0]
+                    aspect_summary = target_item[1]
+                    if aspect_name and aspect_summary:
+                        question_text = f"Summarize the {aspect_name} aspect of this article."
+                        # Ensure answers is a list
+                        answers = [aspect_summary] if isinstance(aspect_summary, str) else (aspect_summary if isinstance(aspect_summary, list) else [str(aspect_summary)])
+                        questions.append({"question": question_text, "answers": answers})
+                elif isinstance(target_item, dict):
+                    # Alternative dict format
+                    aspect_name = target_item.get("aspect") or target_item.get("name") or "aspect"
+                    aspect_summary = target_item.get("summary") or target_item.get("text") or ""
+                    if aspect_summary:
+                        question_text = f"Summarize the {aspect_name} aspect of this article."
+                        answers = [aspect_summary] if isinstance(aspect_summary, str) else (aspect_summary if isinstance(aspect_summary, list) else [str(aspect_summary)])
+                        questions.append({"question": question_text, "answers": answers})
+        
+        # Fallback: check for old format (aspects/summaries dicts)
+        if not questions:
+            aspects = example.get("aspects") or {}
+            summaries = example.get("summaries") or {}
+            
+            if isinstance(aspects, dict) and aspects:
+                for aspect_name, aspect_summary in aspects.items():
+                    if aspect_summary:
+                        question_text = f"Summarize the {aspect_name} aspect of this article."
+                        answers = [aspect_summary] if isinstance(aspect_summary, str) else (aspect_summary if isinstance(aspect_summary, list) else [str(aspect_summary)])
+                        questions.append({"question": question_text, "answers": answers})
+            elif isinstance(summaries, dict) and summaries:
+                for aspect_name, aspect_summary in summaries.items():
+                    if aspect_summary:
+                        question_text = f"Summarize the {aspect_name} aspect of this article."
+                        answers = [aspect_summary] if isinstance(aspect_summary, str) else (aspect_summary if isinstance(aspect_summary, list) else [str(aspect_summary)])
+                        questions.append({"question": question_text, "answers": answers})
+        
+        if not questions:
+            logging.debug("No targets/aspects/summaries found for WikiAsp entry %s", article_id)
+            continue
+        
+        yield article_id, example, questions
+
+
+def iter_longbench_article_questions(dataset_split: Sequence[Dict[str, Any]]) -> Iterable[Tuple[str, Dict[str, Any], List[Dict[str, Any]]]]:
+    """Iterate over LongBench dataset questions.
+    
+    LongBench format:
+    - input: The question/query
+    - context: The long context document
+    - answers: List of true answers
+    - dataset: Name of the sub-dataset
+    - _id: Unique identifier
+    """
+    for idx, example in enumerate(dataset_split):
+        article_id = example.get("_id") or example.get("id") or f"longbench-{idx}"
+        input_text = example.get("input") or ""
+        context = example.get("context") or ""
+        answers = example.get("answers") or []
+        
+        if not input_text:
+            logging.debug("No input/question found for LongBench entry %s", article_id)
+            continue
+        
+        # Ensure answers is a list
+        if isinstance(answers, str):
+            answers = [answers]
+        elif not isinstance(answers, list):
+            answers = [str(answers)] if answers else []
+        
+        # LongBench already has questions as "input", so we use it directly
+        questions = [{"question": input_text, "answers": answers}]
+        
+        yield article_id, example, questions
+
+
 def iter_article_questions(dataset_split: Sequence[Dict[str, Any]], dataset_name: str) -> Iterable[Tuple[str, Dict[str, Any], List[Dict[str, Any]]]]:
     """Dispatch to appropriate iterator based on dataset name."""
     dataset_lower = dataset_name.lower()
@@ -209,6 +321,9 @@ def iter_article_questions(dataset_split: Sequence[Dict[str, Any]], dataset_name
         "quality": iter_quality_article_questions,
         "hotpot": iter_hotpot_article_questions,
         "musique": iter_musique_article_questions,
+        "xsum": iter_xsum_article_questions,
+        "wikiasp": iter_wikiasp_article_questions,
+        "longbench": iter_longbench_article_questions,
     }
     
     iterator_func = iterators.get(dataset_lower, iter_qasper_article_questions)
