@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL RAG Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .sidebar {
+            transition: transform 0.3s ease;
+        }
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+        .file-item:hover {
+            background-color: #f3f4f6;
+        }
+        .file-item.selected {
+            background-color: #dbeafe;
+        }
+        code {
+            background-color: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background-color: #f3f4f6;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex">
+    <!-- Sidebar -->
+    <div id="sidebar" class="sidebar w-80 bg-white shadow-lg flex flex-col">
+        <!-- Sidebar Header -->
+        <div class="p-4 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-800">SQL Database</h2>
+                <div class="flex space-x-2">
+                    <button id="refresh-rag-btn" class="p-2 text-purple-600 hover:bg-purple-50 rounded" title="Refresh RAG System">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button id="refresh-btn" class="p-2 text-gray-600 hover:bg-gray-50 rounded" title="Refresh File List">
+                        <i class="fas fa-redo"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Query Mode Selection -->
+            <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+                <h3 class="text-sm font-medium text-gray-700 mb-2">Query Mode</h3>
+                <div class="space-y-2">
+                    <div class="flex items-center space-x-2">
+                        <input type="radio" id="mode-rag" name="query-mode" value="rag" checked class="text-blue-600">
+                        <label for="mode-rag" class="text-xs text-gray-600">RAG (Schema Questions)</label>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <input type="radio" id="mode-sqlcoder" name="query-mode" value="sqlcoder" class="text-blue-600">
+                        <label for="mode-sqlcoder" class="text-xs text-gray-600">SQLCoder (Generate SQL)</label>
+                    </div>
+                </div>
+                
+                <!-- SQLCoder Status -->
+                <div id="sqlcoder-status" class="mt-2 text-xs hidden">
+                    <p>SQLCoder: Checking...</p>
+                </div>
+            </div>
+            
+            <!-- Language Model Selection -->
+            <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+                <h3 class="text-sm font-medium text-gray-700 mb-2">Language Model</h3>
+                <div class="space-y-2">
+                    <div class="flex items-center space-x-2">
+                        <input type="radio" id="use-local" name="model-type" value="local" checked class="text-blue-600">
+                        <label for="use-local" class="text-xs text-gray-600">Local T5-Small</label>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <input type="radio" id="use-chatgpt5" name="model-type" value="chatgpt5" class="text-blue-600">
+                        <label for="use-chatgpt5" class="text-xs text-gray-600">ChatGPT 5 (API)</label>
+                    </div>
+                    
+                    <!-- API Key Input -->
+                    <div id="api-key-section" class="hidden">
+                        <label for="api-key-input" class="block text-xs text-gray-600 mb-1">OpenAI API Key:</label>
+                        <div class="flex space-x-2">
+                            <input type="password" id="api-key-input" placeholder="Enter your OpenAI API key" 
+                                   class="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            <button id="validate-api-btn" class="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 transition-colors">Validate</button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Your API key is stored locally.</p>
+                        <div id="api-validation-status" class="mt-2 text-xs hidden"></div>
+                    </div>
+                    
+                    <div id="model-status" class="text-xs text-gray-600">
+                        <p>Using Local T5-Small Model</p>
+                        <p id="gpu-status-text" class="text-gray-500">GPU: Checking...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Status -->
+            <div class="mt-4 text-xs text-gray-600">
+                <div id="system-status">System: Loading...</div>
+            </div>
+        </div>
+
+        <!-- SQL Files List -->
+        <div class="flex-1 p-4 overflow-y-auto">
+            <h3 class="text-sm font-medium text-gray-700 mb-2">SQL Files</h3>
+            <div id="sql-files-list" class="space-y-2">
+                <div class="text-gray-500 text-sm">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Sidebar Footer -->
+        <div class="p-4 border-t border-gray-200">
+            <div class="text-xs text-gray-500">
+                <div id="file-count">0 files</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+        <!-- Header -->
+        <div class="bg-white shadow-sm border-b border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <button id="sidebar-toggle" class="p-2 text-gray-600 hover:bg-gray-100 rounded">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="text-2xl font-bold text-gray-800">SQL RAG Chatbot</h1>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="flex-1 p-4 flex flex-col">
+            <div id="chat-container" class="bg-white rounded-lg shadow-md p-4 flex-1 overflow-y-auto mb-4">
+                <div id="chat-messages">
+                    <div class="text-center text-gray-500 text-sm mt-4">
+                        Welcome! Ask questions about your SQL database schema.<br>
+                        <span class="text-xs">Example: "What tables are in this database?" or "Describe the accident_master table"</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-col space-y-2">
+                <div class="flex">
+                    <input type="text" id="user-input" class="flex-grow p-3 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                           placeholder="Ask about database schema, tables, columns...">
+                    <button id="send-btn" class="bg-blue-500 text-white p-3 rounded-r-lg hover:bg-blue-600">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                
+                <!-- SQLCoder Options (hidden by default) -->
+                <div id="sqlcoder-options" class="hidden flex flex-col space-y-2">
+                    <div class="flex items-center space-x-2">
+                        <select id="sql-file-select" class="flex-1 p-2 border rounded text-sm">
+                            <option value="">Select SQL file...</option>
+                        </select>
+                        <button id="generate-sql-btn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm">
+                            <i class="fas fa-code"></i> Generate SQL
+                        </button>
+                    </div>
+                    <!-- Generated SQL Display and Execute Button (hidden initially) -->
+                    <div id="generated-sql-section" class="hidden">
+                        <div class="bg-gray-50 border rounded-lg p-3">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-semibold text-gray-700">Generated SQL:</span>
+                                <button id="execute-sql-btn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm">
+                                    <i class="fas fa-play"></i> Execute SQL
+                                </button>
+                            </div>
+                            <pre id="generated-sql-query" class="bg-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto max-h-40 overflow-y-auto"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="notification-toast" class="fixed top-4 right-4 z-50 hidden">
+        <div class="bg-white rounded-lg shadow-lg border-l-4 p-4 max-w-sm">
+            <div class="flex items-center">
+                <div id="notification-icon" class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-blue-500"></i>
+                </div>
+                <div class="ml-3">
+                    <p id="notification-message" class="text-sm font-medium text-gray-900"></p>
+                </div>
+                <div class="ml-auto pl-3">
+                    <button onclick="hideNotification()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let sqlFiles = [];
+        let selectedFile = null;
+        let currentQueryMode = 'rag';
+        let lastGeneratedSQL = null;
+        let lastSelectedFilename = null;
+
+        // DOM elements
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const refreshRagBtn = document.getElementById('refresh-rag-btn');
+        const sqlFilesList = document.getElementById('sql-files-list');
+        const fileCount = document.getElementById('file-count');
+        const systemStatus = document.getElementById('system-status');
+        const gpuStatusText = document.getElementById('gpu-status-text');
+        const apiKeySection = document.getElementById('api-key-section');
+        const apiKeyInput = document.getElementById('api-key-input');
+        const validateApiBtn = document.getElementById('validate-api-btn');
+        const apiValidationStatus = document.getElementById('api-validation-status');
+        const notificationToast = document.getElementById('notification-toast');
+        const notificationIcon = document.getElementById('notification-icon');
+        const notificationMessage = document.getElementById('notification-message');
+        const sqlcoderStatus = document.getElementById('sqlcoder-status');
+        const sqlcoderOptions = document.getElementById('sqlcoder-options');
+        const sqlFileSelect = document.getElementById('sql-file-select');
+        const generateSqlBtn = document.getElementById('generate-sql-btn');
+        const generatedSqlSection = document.getElementById('generated-sql-section');
+        const generatedSqlQuery = document.getElementById('generated-sql-query');
+        const executeSqlBtn = document.getElementById('execute-sql-btn');
+
+        // Sidebar toggle
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+        });
+
+        // Query mode toggle
+        document.querySelectorAll('input[name="query-mode"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                currentQueryMode = e.target.value;
+                if (e.target.value === 'sqlcoder') {
+                    sqlcoderOptions.classList.remove('hidden');
+                    userInput.placeholder = 'Ask a question to generate SQL query (e.g., "Show all accident records from 1975")';
+                    checkSQLCoderStatus();
+                } else {
+                    sqlcoderOptions.classList.add('hidden');
+                    generatedSqlSection.classList.add('hidden');
+                    userInput.placeholder = 'Ask about database schema, tables, columns...';
+                }
+            });
+        });
+
+        // Model type toggle
+        document.querySelectorAll('input[name="model-type"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                if (e.target.value === 'chatgpt5') {
+                    apiKeySection.classList.remove('hidden');
+                } else {
+                    apiKeySection.classList.add('hidden');
+                }
+            });
+        });
+        
+        // Check SQLCoder status
+        async function checkSQLCoderStatus() {
+            try {
+                const response = await fetch('/api/sqlcoder/status');
+                const data = await response.json();
+                sqlcoderStatus.classList.remove('hidden');
+                if (data.available) {
+                    sqlcoderStatus.innerHTML = '<p class="text-green-600">✓ SQLCoder available</p>';
+                } else {
+                    // Show formatted message with better styling
+                    const message = data.formatted_message || data.message || 'SQLCoder not available';
+                    sqlcoderStatus.innerHTML = `
+                        <div class="text-red-600">
+                            <p class="font-semibold mb-1">✗ SQLCoder not available</p>
+                            <div class="text-xs bg-red-50 p-2 rounded border border-red-200 whitespace-pre-line">${message}</div>
+                            <div class="text-xs mt-2 text-gray-600">
+                                <strong>Quick Setup:</strong><br>
+                                1. Install: <code class="bg-gray-200 px-1 rounded">curl https://ollama.ai/install.sh | sh</code><br>
+                                2. Start: <code class="bg-gray-200 px-1 rounded">ollama serve</code><br>
+                                3. Install model: <code class="bg-gray-200 px-1 rounded">ollama pull sqlcoder</code>
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                sqlcoderStatus.classList.remove('hidden');
+                sqlcoderStatus.innerHTML = `
+                    <div class="text-red-600">
+                        <p>✗ Error checking SQLCoder</p>
+                        <div class="text-xs mt-1">${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Generate SQL button
+        generateSqlBtn.addEventListener('click', async () => {
+            const question = userInput.value.trim();
+            const filename = sqlFileSelect.value;
+            
+            if (!question) {
+                showNotification('Please enter a question', 'error');
+                return;
+            }
+            
+            if (!filename) {
+                showNotification('Please select a SQL file', 'error');
+                return;
+            }
+            
+            generateSqlBtn.disabled = true;
+            generateSqlBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            
+            // Hide previous SQL section
+            generatedSqlSection.classList.add('hidden');
+            
+            const loadingId = addMessage('Generating SQL query...', 'assistant', true);
+            
+            try {
+                // Generate SQL without executing
+                const response = await fetch('/api/sqlcoder/generate-and-execute', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({question, filename, execute: false})
+                });
+                
+                const data = await response.json();
+                document.getElementById(loadingId).remove();
+                
+                if (data.success && data.sql_query) {
+                    // Store generated SQL for execution
+                    lastGeneratedSQL = data.sql_query;
+                    lastSelectedFilename = filename;
+                    
+                    // Display generated SQL in the section
+                    generatedSqlQuery.textContent = data.sql_query;
+                    generatedSqlSection.classList.remove('hidden');
+                    
+                    // Add user message to chat
+                    addMessage(question, 'user');
+                    
+                    // Add SQL generation message to chat
+                    const sqlMsg = `
+                        <div class="bg-gray-200 text-gray-800 inline-block max-w-3xl p-3 rounded-lg">
+                            <div class="mb-2">
+                                <strong>Generated SQL Query:</strong>
+                                <pre class="bg-gray-800 text-green-400 p-3 rounded mt-2 text-xs overflow-x-auto max-h-60 overflow-y-auto">${data.sql_query.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+                            </div>
+                            <div class="text-sm text-gray-600 mb-2">${data.message || 'SQL query generated successfully'}</div>
+                            <button onclick="executeGeneratedSQL()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm mt-2">
+                                <i class="fas fa-play"></i> Execute SQL Query
+                            </button>
+                        </div>
+                    `;
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = 'mb-4 text-left';
+                    msgDiv.innerHTML = sqlMsg;
+                    chatMessages.appendChild(msgDiv);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    
+                    showNotification('SQL query generated successfully. Click "Execute SQL Query" to run it.', 'success');
+                } else {
+                    addMessage(`Error: ${data.message}`, 'assistant');
+                    showNotification(data.message, 'error');
+                }
+            } catch (error) {
+                document.getElementById(loadingId).remove();
+                addMessage('Error generating SQL', 'assistant');
+                showNotification('Error generating SQL', 'error');
+            } finally {
+                generateSqlBtn.disabled = false;
+                generateSqlBtn.innerHTML = '<i class="fas fa-code"></i> Generate SQL';
+            }
+        });
+        
+        // Execute SQL button
+        executeSqlBtn.addEventListener('click', () => {
+            if (lastGeneratedSQL && lastSelectedFilename) {
+                executeGeneratedSQL();
+            } else {
+                showNotification('No SQL query to execute. Please generate SQL first.', 'error');
+            }
+        });
+        
+        // Execute generated SQL function
+        async function executeGeneratedSQL() {
+            if (!lastGeneratedSQL || !lastSelectedFilename) {
+                showNotification('No SQL query to execute', 'error');
+                return;
+            }
+            
+            executeSqlBtn.disabled = true;
+            executeSqlBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Executing...';
+            
+            const loadingId = addMessage('Executing SQL query...', 'assistant', true);
+            
+            try {
+                const response = await fetch('/api/sql/execute', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        sql_query: lastGeneratedSQL,
+                        filename: lastSelectedFilename
+                    })
+                });
+                
+                const data = await response.json();
+                document.getElementById(loadingId).remove();
+                
+                if (data.success && data.results) {
+                    // Display SQL results in chat
+                    displaySQLResults(lastGeneratedSQL, data.results, data.message);
+                    showNotification(`Query executed successfully. Returned ${data.results.row_count || 0} rows.`, 'success');
+                } else {
+                    addMessage(`Execution Error: ${data.message}`, 'assistant');
+                    showNotification(data.message, 'error');
+                }
+            } catch (error) {
+                document.getElementById(loadingId).remove();
+                addMessage('Error executing SQL', 'assistant');
+                showNotification('Error executing SQL', 'error');
+            } finally {
+                executeSqlBtn.disabled = false;
+                executeSqlBtn.innerHTML = '<i class="fas fa-play"></i> Execute SQL';
+            }
+        }
+        
+        // Make executeGeneratedSQL available globally
+        window.executeGeneratedSQL = executeGeneratedSQL;
+        
+        // Display SQL results
+        function displaySQLResults(sqlQuery, results, message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'mb-4 text-left';
+            
+            let html = `
+                <div class="bg-gray-200 text-gray-800 inline-block max-w-3xl p-3 rounded-lg">
+                    <div class="mb-2">
+                        <strong>Generated SQL:</strong>
+                        <pre class="bg-gray-800 text-green-400 p-3 rounded mt-2 text-xs overflow-x-auto"><code>${sqlQuery.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
+                    </div>
+                    <div class="text-sm text-gray-600 mb-2">${message}</div>
+                </div>
+            `;
+            
+            if (results && results.rows && results.rows.length > 0) {
+                html += `
+                    <div class="mt-3 bg-white border rounded-lg shadow-md overflow-x-auto max-w-3xl">
+                        <div class="p-2 bg-gray-50 border-b">
+                            <strong>Query Results:</strong> ${results.row_count} row${results.row_count !== 1 ? 's' : ''}
+                        </div>
+                        <table class="min-w-full divide-y divide-gray-200 text-xs">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    ${results.columns.map(col => `<th class="px-4 py-2 text-left font-semibold text-gray-700">${col}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${results.rows.slice(0, 100).map(row => `
+                                    <tr class="hover:bg-gray-50">
+                                        ${results.columns.map(col => `<td class="px-4 py-2 text-gray-700">${row[col] !== null ? String(row[col]) : 'NULL'}</td>`).join('')}
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        ${results.row_count > 100 ? `<div class="p-2 bg-gray-50 text-xs text-gray-600">Showing first 100 of ${results.row_count} rows</div>` : ''}
+                    </div>
+                `;
+            } else if (results) {
+                html += `
+                    <div class="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                        Query executed successfully but returned no rows.
+                    </div>
+                `;
+            }
+            
+            messageDiv.innerHTML = html;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Validate API key
+        validateApiBtn.addEventListener('click', async () => {
+            const apiKey = apiKeyInput.value.trim();
+            if (!apiKey) {
+                showNotification('Please enter an API key', 'error');
+                return;
+            }
+
+            validateApiBtn.disabled = true;
+            validateApiBtn.textContent = 'Validating...';
+            apiValidationStatus.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/chatgpt5/validate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({api_key: apiKey})
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    apiValidationStatus.innerHTML = '<p class="text-green-600">✓ Valid API key</p>';
+                    showNotification('API key validated successfully', 'success');
+                    // Toggle model
+                    await toggleModel(true, apiKey);
+                } else {
+                    apiValidationStatus.innerHTML = `<p class="text-red-600">✗ ${data.message}</p>`;
+                    showNotification('API key validation failed', 'error');
+                }
+            } catch (error) {
+                apiValidationStatus.innerHTML = '<p class="text-red-600">Error validating API key</p>';
+                showNotification('Error validating API key', 'error');
+            } finally {
+                validateApiBtn.disabled = false;
+                validateApiBtn.textContent = 'Validate';
+            }
+        });
+
+        // Toggle model
+        async function toggleModel(useChatGPT5, apiKey = null) {
+            try {
+                const response = await fetch('/api/chatgpt5/toggle', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        use_chatgpt5: useChatGPT5,
+                        api_key: apiKey || apiKeyInput.value.trim()
+                    })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    const modelStatus = document.getElementById('model-status');
+                    if (useChatGPT5) {
+                        modelStatus.innerHTML = '<p>Using ChatGPT 5 (API)</p>';
+                    } else {
+                        modelStatus.innerHTML = '<p>Using Local T5-Small Model</p>';
+                    }
+                    showNotification(data.message, 'success');
+                }
+            } catch (error) {
+                showNotification('Error toggling model', 'error');
+            }
+        }
+
+        // Load SQL files
+        async function loadSQLFiles() {
+            try {
+                const response = await fetch('/api/sql/files');
+                const data = await response.json();
+                sqlFiles = data.files || [];
+                
+                if (sqlFiles.length > 0) {
+                    sqlFilesList.innerHTML = sqlFiles.map(file => `
+                        <div class="file-item p-2 border rounded cursor-pointer" onclick="selectFile('${file.name}')">
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-database text-blue-500"></i>
+                                <span class="text-sm text-gray-700 font-medium">${file.name}</span>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                ${file.size_mb.toFixed(2)} MB • Modified: ${file.modified}
+                            </div>
+                        </div>
+                    `).join('');
+                    fileCount.textContent = `${sqlFiles.length} file${sqlFiles.length !== 1 ? 's' : ''}`;
+                    
+                    // Populate SQL file select dropdown
+                    sqlFileSelect.innerHTML = '<option value="">Select SQL file...</option>' + 
+                        sqlFiles.map(file => `<option value="${file.name}">${file.name} (${file.size_mb.toFixed(2)} MB)</option>`).join('');
+                } else {
+                    sqlFilesList.innerHTML = '<div class="text-gray-500 text-sm">No SQL files found in SQL directory</div>';
+                    fileCount.textContent = '0 files';
+                    sqlFileSelect.innerHTML = '<option value="">No SQL files available</option>';
+                }
+            } catch (error) {
+                console.error('Error loading SQL files:', error);
+                sqlFilesList.innerHTML = '<div class="text-red-500 text-sm">Error loading files</div>';
+            }
+        }
+
+        // Select file
+        function selectFile(filename) {
+            selectedFile = filename;
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+        }
+
+        // Check system status
+        async function checkStatus() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                if (data.status === 'ready') {
+                    const device = data.info.gpu_info && data.info.gpu_info.available ? 'GPU' : 'CPU';
+                    const gpuText = data.info.gpu_info && data.info.gpu_info.available ? 
+                        ` (${data.info.gpu_info.device_name})` : '';
+                    systemStatus.textContent = `System: Ready (${data.info.num_documents} docs, ${device}${gpuText})`;
+                    systemStatus.className = 'text-green-600';
+                } else {
+                    systemStatus.textContent = `System: ${data.status}`;
+                    systemStatus.className = 'text-red-600';
+                }
+            } catch (error) {
+                console.error('Error checking status:', error);
+                systemStatus.textContent = 'System: Error';
+                systemStatus.className = 'text-red-600';
+            }
+        }
+
+        // Check GPU status
+        async function checkGPUStatus() {
+            try {
+                const response = await fetch('/api/gpu/status');
+                const data = await response.json();
+                if (data.available) {
+                    gpuStatusText.textContent = `GPU: ${data.device_name} (${data.memory_gb?.toFixed(1)} GB)`;
+                    gpuStatusText.className = 'text-green-600';
+                } else {
+                    gpuStatusText.textContent = 'GPU: Not Available (CPU mode)';
+                    gpuStatusText.className = 'text-gray-500';
+                }
+            } catch (error) {
+                console.error('Error checking GPU status:', error);
+                gpuStatusText.textContent = 'GPU: Unknown';
+            }
+        }
+
+        // Send message
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            
+            if (!message) return;
+            
+            // Check query mode
+            if (currentQueryMode === 'sqlcoder') {
+                // Use SQLCoder mode
+                const filename = sqlFileSelect.value;
+                if (!filename) {
+                    showNotification('Please select a SQL file first', 'error');
+                    return;
+                }
+                generateSqlBtn.click();
+                return;
+            }
+            
+            // Add user message to chat
+            addMessage(message, 'user');
+            userInput.value = '';
+            
+            // Show loading
+            const loadingId = addMessage('Thinking...', 'assistant', true);
+            
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message})
+                });
+                
+                const data = await response.json();
+                
+                // Remove loading message
+                document.getElementById(loadingId).remove();
+                
+                // Add assistant response
+                addMessage(data.response, 'assistant', false, data.sources);
+            } catch (error) {
+                document.getElementById(loadingId).remove();
+                addMessage('Sorry, there was an error processing your request.', 'assistant');
+                showNotification('Error sending message', 'error');
+            }
+        }
+
+        // Add message to chat
+        function addMessage(text, sender, isLoading = false, sources = []) {
+            const messagesDiv = chatMessages;
+            const messageId = 'msg-' + Date.now();
+            const messageDiv = document.createElement('div');
+            messageDiv.id = messageId;
+            messageDiv.className = `mb-4 ${sender === 'user' ? 'text-right' : 'text-left'}`;
+            
+            const bubbleClass = sender === 'user' 
+                ? 'bg-blue-500 text-white inline-block max-w-3xl p-3 rounded-lg' 
+                : 'bg-gray-200 text-gray-800 inline-block max-w-3xl p-3 rounded-lg';
+            
+            let html = '';
+            if (isLoading) {
+                html = `<div class="${bubbleClass}"><i class="fas fa-spinner fa-spin"></i> Thinking...</div>`;
+            } else {
+                // Format SQL-related terms
+                let formattedText = text;
+                formattedText = formattedText.replace(/`(\w+)`/g, '<code>$1</code>');
+                formattedText = formattedText.replace(/\n/g, '<br>');
+                
+                html = `<div class="${bubbleClass}">${formattedText}</div>`;
+                
+                // Add sources
+                if (sources && sources.length > 0) {
+                    html += `<div class="mt-2 text-xs text-gray-500">
+                        <details class="cursor-pointer hover:text-gray-700">
+                            <summary>📚 ${sources.length} source${sources.length !== 1 ? 's' : ''}</summary>
+                            <div class="mt-2 space-y-2 max-w-3xl">
+                                ${sources.map(source => `
+                                    <div class="p-2 bg-gray-50 rounded border border-gray-200">
+                                        <div class="font-semibold text-blue-600">${source.table_name || 'N/A'}</div>
+                                        <div class="text-gray-600 text-xs">${source.filename}</div>
+                                        ${source.column_count > 0 ? `<div class="text-gray-500 text-xs">${source.column_count} columns</div>` : ''}
+                                        <div class="text-gray-500 text-xs mt-1">${source.text_preview.substring(0, 150)}...</div>
+                                        <div class="mt-2 flex space-x-2">
+                                            <button onclick="viewSQLFile('${source.filename}')" 
+                                                    class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">
+                                                📄 View SQL
+                                            </button>
+                                            <button onclick="openChunkModal('${source.filename}', ${source.rank}, \`${(source.chunk || '').replace(/`/g, '\\`').replace(/\$/g, '\\$').replace(/\\/g, '\\\\')}\`)" 
+                                                    class="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600">
+                                                📝 View Chunk
+                                            </button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </details>
+                    </div>`;
+                }
+            }
+            
+            messageDiv.innerHTML = html;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            return messageId;
+        }
+
+        // View SQL file
+        async function viewSQLFile(filename) {
+            try {
+                const response = await fetch(`/api/sql/files/${filename}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    showNotification('Error loading SQL file: ' + data.error, 'error');
+                    return;
+                }
+                
+                // Create modal
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-lg p-6 max-w-5xl max-h-[90vh] overflow-y-auto m-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">${filename}</h3>
+                            <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="mb-2 text-sm text-gray-600">
+                            ${data.is_preview ? `Showing preview (first ${(data.preview_size / 1024 / 1024).toFixed(1)} MB of ${(data.total_size / 1024 / 1024).toFixed(1)} MB)` : `Full file (${(data.total_size / 1024 / 1024).toFixed(1)} MB)`}
+                        </div>
+                        <pre class="bg-gray-50 p-4 rounded border overflow-x-auto text-xs">${data.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+                        <div class="mt-4 flex justify-end">
+                            <a href="/api/sql/files/${filename}/download" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                                Download Full File
+                            </a>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+            } catch (error) {
+                showNotification('Error loading SQL file', 'error');
+            }
+        }
+
+        // Open chunk modal
+        function openChunkModal(filename, rank, chunkContent) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-y-auto m-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">${filename} - Chunk #${rank}</h3>
+                        <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <pre class="bg-gray-50 p-4 rounded border overflow-x-auto text-xs whitespace-pre-wrap">${chunkContent.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        // Refresh RAG system
+        refreshRagBtn.addEventListener('click', async () => {
+            refreshRagBtn.disabled = true;
+            refreshRagBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            
+            try {
+                const response = await fetch('/api/rag/refresh', {method: 'POST'});
+                const data = await response.json();
+                showNotification(data.message, data.success ? 'success' : 'error');
+                checkStatus();
+            } catch (error) {
+                showNotification('Error refreshing RAG system', 'error');
+            } finally {
+                refreshRagBtn.disabled = false;
+                refreshRagBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+            }
+        });
+
+        // Refresh files
+        refreshBtn.addEventListener('click', () => {
+            loadSQLFiles();
+            showNotification('File list refreshed', 'info');
+        });
+
+        // Notification functions
+        function showNotification(message, type = 'info') {
+            const icons = {
+                'success': '<i class="fas fa-check-circle text-green-500"></i>',
+                'error': '<i class="fas fa-exclamation-circle text-red-500"></i>',
+                'info': '<i class="fas fa-info-circle text-blue-500"></i>'
+            };
+            
+            notificationIcon.innerHTML = icons[type] || icons.info;
+            notificationMessage.textContent = message;
+            notificationToast.classList.remove('hidden');
+            
+            setTimeout(() => {
+                hideNotification();
+            }, 5000);
+        }
+
+        function hideNotification() {
+            notificationToast.classList.add('hidden');
+        }
+
+        // Event listeners
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Initialize
+        loadSQLFiles();
+        checkStatus();
+        checkGPUStatus();
+        setInterval(checkStatus, 30000); // Check every 30 seconds
+    </script>
+</body>
+</html>
+
