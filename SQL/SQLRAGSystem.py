@@ -8,6 +8,7 @@ Similar to RAGSystem.py but specialized for SQL files
 import os
 import re
 import logging
+import json
 from typing import List, Tuple, Optional, Dict, Any
 from pathlib import Path
 
@@ -53,6 +54,9 @@ class SQLProcessor:
                     self.logger.error(f"Failed to read SQL file: {e2}")
                     return {}
             
+            # Extract database name
+            database_name = self._extract_database_name(content, sql_path)
+            
             # Extract CREATE TABLE statements
             table_schemas = self._extract_table_schemas(content)
             
@@ -66,6 +70,7 @@ class SQLProcessor:
                 'filename': Path(sql_path).name,
                 'file_path': sql_path,
                 'file_size': file_size,
+                'database_name': database_name,
                 'table_schemas': table_schemas,
                 'insert_info': insert_info,
                 'other_statements': other_statements,
@@ -75,6 +80,36 @@ class SQLProcessor:
         except Exception as e:
             self.logger.error(f"Error parsing SQL file {sql_path}: {e}")
             return {}
+    
+    def _extract_database_name(self, content: str, sql_path: str) -> str:
+        """Extract database name from SQL file content or infer from filename."""
+        # Try to find database name in comments (MySQL dump format)
+        # Pattern: -- Host: ... Database: <name>
+        db_pattern = r'--\s*Host:.*?Database:\s*(\w+)'
+        match = re.search(db_pattern, content, re.IGNORECASE)
+        if match:
+            return match.group(1)
+        
+        # Try to find CREATE DATABASE statement
+        create_db_pattern = r'CREATE\s+DATABASE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?(\w+)[`"]?'
+        match = re.search(create_db_pattern, content, re.IGNORECASE)
+        if match:
+            return match.group(1)
+        
+        # Try to find USE statement
+        use_pattern = r'USE\s+[`"]?(\w+)[`"]?'
+        match = re.search(use_pattern, content, re.IGNORECASE)
+        if match:
+            return match.group(1)
+        
+        # Infer from filename (e.g., "fars_database.sql" -> "fars")
+        filename = Path(sql_path).stem  # Get filename without extension
+        # Remove common suffixes
+        filename = re.sub(r'_(database|db|sql|dump)$', '', filename, flags=re.IGNORECASE)
+        # Remove common prefixes
+        filename = re.sub(r'^(database|db|sql|dump)_', '', filename, flags=re.IGNORECASE)
+        
+        return filename if filename else Path(sql_path).stem
     
     def _extract_table_schemas(self, content: str) -> Dict[str, Any]:
         """Extract CREATE TABLE statements."""
@@ -370,9 +405,20 @@ class SQLProcessor:
 class SQLRAGSystem:
     """Main SQL RAG System that orchestrates all components."""
     
-    def __init__(self, config: Optional[RAGConfig] = None):
+    def __init__(self, config: Optional[RAGConfig] = None, schema_cache_dir: Optional[str] = None):
         self.config = config or RAGConfig(chunk_size=2000)
         self.logger = logging.getLogger(__name__)
+        
+        # Set up schema cache directory
+        if schema_cache_dir:
+            self.schema_cache_dir = Path(schema_cache_dir)
+        else:
+            # Default to SQL directory
+            self.schema_cache_dir = Path(__file__).parent / "schema_cache"
+        self.schema_cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Store extracted schemas
+        self.extracted_schemas: Dict[str, Dict[str, Any]] = {}
         
         # Log device information
         self.logger.info(f"Initializing SQL RAG system on device: {self.config.device}")
@@ -393,6 +439,9 @@ class SQLRAGSystem:
             openai_api_key=self.config.openai_api_key
         )
         
+        # Try to load cached schemas
+        self._load_cached_schemas()
+        
         self.logger.info("SQL RAG system initialized successfully")
     
     def load_documents(self, sql_directory: str) -> None:
@@ -405,12 +454,270 @@ class SQLRAGSystem:
                 self.logger.warning("No documents loaded")
                 return
             
+            # Extract and store schemas from parsed files
+            self._extract_and_store_schemas(sql_directory)
+            
             self.retriever.build_index(documents, metadata)
             self.logger.info(f"Successfully loaded and indexed {len(documents)} document chunks")
             
         except Exception as e:
             self.logger.error(f"Failed to load documents: {e}")
             raise
+    
+    def _extract_and_store_schemas(self, sql_directory: str) -> None:
+        """Extract schemas from SQL files and store them offline."""
+        try:
+            directory_path = Path(sql_directory)
+            sql_files = list(directory_path.glob("*.sql"))
+            
+            for sql_file in sql_files:
+                parsed = self.sql_processor.parse_sql_file(str(sql_file))
+                
+                if parsed and parsed.get('table_schemas'):
+                    # Store schemas by database name
+                    filename = parsed['filename']
+                    database_name = parsed.get('database_name')
+                    # If database_name is not found, infer from filename (remove .sql extension)
+                    if not database_name:
+                        filename_stem = Path(filename).stem  # Remove .sql extension
+                        database_name = re.sub(r'_(database|db|sql|dump)$', '', filename_stem, flags=re.IGNORECASE)
+                        database_name = re.sub(r'^(database|db|sql|dump)_', '', database_name, flags=re.IGNORECASE)
+                        if not database_name:
+                            database_name = filename_stem
+                    self.extracted_schemas[database_name] = {
+                        'filename': parsed['filename'],
+                        'file_path': parsed['file_path'],
+                        'file_size': parsed['file_size'],
+                        'database_name': database_name,
+                        'table_schemas': parsed['table_schemas'],
+                        'total_tables': parsed['total_tables'],
+                        'insert_info': parsed.get('insert_info', {})
+                    }
+                    self.logger.info(f"Extracted schemas from {filename} (database: {database_name}): {parsed['total_tables']} tables")
+            
+            # Save schemas to cache file
+            self._save_schemas_to_cache()
+            
+        except Exception as e:
+            self.logger.error(f"Failed to extract and store schemas: {e}")
+    
+    def _save_schema_to_cache(self, database_name: str) -> None:
+        """Save a single schema to its own JSON cache file."""
+        try:
+            if database_name not in self.extracted_schemas:
+                self.logger.warning(f"Schema for {database_name} not found in extracted_schemas")
+                return
+            
+            schema_data = self.extracted_schemas[database_name]
+            
+            # Ensure database_name doesn't contain file extensions (safety check)
+            clean_db_name = database_name
+            if '.' in clean_db_name:
+                # Remove file extensions if present
+                clean_db_name = Path(clean_db_name).stem
+                self.logger.warning(f"Database name contained extension, cleaned to: {clean_db_name}")
+            
+            # Convert to serializable format
+            cache_data = {
+                'filename': schema_data.get('filename', ''),
+                'file_path': str(schema_data['file_path']),
+                'file_size': schema_data['file_size'],
+                'database_name': schema_data.get('database_name', clean_db_name),
+                'total_tables': schema_data['total_tables'],
+                'insert_info': schema_data['insert_info'],
+                'table_schemas': {}
+            }
+            
+            # Store table schemas with CREATE statements
+            for table_name, table_info in schema_data['table_schemas'].items():
+                cache_data['table_schemas'][table_name] = {
+                    'name': table_name,
+                    'create_statement': table_info['create_statement'],
+                    'schema_description': table_info['schema_description'],
+                    'column_count': table_info['column_count'],
+                    'columns': [
+                        {
+                            'name': col['name'],
+                            'type': col['type'],
+                            'constraints': col['constraints']
+                        }
+                        for col in table_info['columns']
+                    ]
+                }
+            
+            # Save to individual file: {clean_db_name}_schema.json
+            cache_file = self.schema_cache_dir / f"{clean_db_name}_schema.json"
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(cache_data, f, indent=2, ensure_ascii=False)
+            
+            self.logger.info(f"Saved schema for {clean_db_name} to cache: {cache_file}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to save schema for {database_name} to cache: {e}")
+    
+    def _save_schemas_to_cache(self) -> None:
+        """Save all extracted schemas to individual JSON cache files."""
+        try:
+            for database_name in self.extracted_schemas.keys():
+                self._save_schema_to_cache(database_name)
+            self.logger.info(f"Saved {len(self.extracted_schemas)} schemas to cache directory")
+        except Exception as e:
+            self.logger.error(f"Failed to save schemas to cache: {e}")
+    
+    def _load_cached_schemas(self) -> None:
+        """Load schemas from individual cache files in the cache directory."""
+        try:
+            # Load all *_schema.json files from cache directory
+            schema_files = list(self.schema_cache_dir.glob("*_schema.json"))
+            
+            # Also check for old schemas.json file for migration
+            old_cache_file = self.schema_cache_dir / "schemas.json"
+            if old_cache_file.exists():
+                self.logger.info("Found old schemas.json file, migrating to individual files...")
+                try:
+                    with open(old_cache_file, 'r', encoding='utf-8') as f:
+                        old_cache_data = json.load(f)
+                    
+                    # Migrate each schema to individual file
+                    for database_name, schema_data in old_cache_data.items():
+                        db_name = schema_data.get('database_name', database_name)
+                        # Save to new format
+                        self.extracted_schemas[db_name] = {
+                            'filename': schema_data.get('filename', ''),
+                            'file_path': Path(schema_data['file_path']),
+                            'file_size': schema_data['file_size'],
+                            'database_name': db_name,
+                            'total_tables': schema_data['total_tables'],
+                            'insert_info': schema_data['insert_info'],
+                            'table_schemas': {}
+                        }
+                        
+                        # Reconstruct table schemas
+                        for table_name, table_info in schema_data['table_schemas'].items():
+                            self.extracted_schemas[db_name]['table_schemas'][table_name] = {
+                                'name': table_name,
+                                'create_statement': table_info['create_statement'],
+                                'schema_description': table_info['schema_description'],
+                                'column_count': table_info['column_count'],
+                                'columns': [
+                                    {
+                                        'name': col['name'],
+                                        'type': col['type'],
+                                        'constraints': col['constraints'],
+                                        'definition': f"{col['name']} {col['type']}"
+                                    }
+                                    for col in table_info['columns']
+                                ]
+                            }
+                    
+                    # Save migrated schemas to individual files
+                    self._save_schemas_to_cache()
+                    # Optionally remove old file after migration
+                    # old_cache_file.unlink()
+                    self.logger.info("Migration completed")
+                except Exception as e:
+                    self.logger.warning(f"Failed to migrate old cache file: {e}")
+            
+            # Load individual schema files
+            for schema_file in schema_files:
+                try:
+                    with open(schema_file, 'r', encoding='utf-8') as f:
+                        schema_data = json.load(f)
+                    
+                    # Extract database name from filename (remove _schema.json)
+                    database_name = schema_file.stem.replace('_schema', '')
+                    # Prefer database_name from JSON, fallback to extracted from filename
+                    db_name = schema_data.get('database_name') or database_name
+                    # Ensure db_name is not empty
+                    if not db_name:
+                        db_name = database_name
+                    
+                    self.extracted_schemas[db_name] = {
+                        'filename': schema_data.get('filename', ''),
+                        'file_path': Path(schema_data['file_path']),
+                        'file_size': schema_data['file_size'],
+                        'database_name': db_name,
+                        'total_tables': schema_data['total_tables'],
+                        'insert_info': schema_data['insert_info'],
+                        'table_schemas': {}
+                    }
+                    
+                    # Reconstruct table schemas
+                    for table_name, table_info in schema_data['table_schemas'].items():
+                        self.extracted_schemas[db_name]['table_schemas'][table_name] = {
+                            'name': table_name,
+                            'create_statement': table_info['create_statement'],
+                            'schema_description': table_info['schema_description'],
+                            'column_count': table_info['column_count'],
+                            'columns': [
+                                {
+                                    'name': col['name'],
+                                    'type': col['type'],
+                                    'constraints': col['constraints'],
+                                    'definition': f"{col['name']} {col['type']}"
+                                }
+                                for col in table_info['columns']
+                            ]
+                        }
+                except Exception as e:
+                    self.logger.warning(f"Failed to load schema file {schema_file}: {e}")
+                    continue
+            
+            if schema_files or old_cache_file.exists():
+                self.logger.info(f"Loaded {len(self.extracted_schemas)} schemas from cache")
+            else:
+                self.logger.info("No schema cache files found, will create them when schemas are extracted")
+                
+        except Exception as e:
+            self.logger.warning(f"Failed to load cached schemas: {e}")
+    
+    def get_combined_schema(self, table_names: Optional[List[str]] = None) -> str:
+        """
+        Get combined schema string for SQLCoder to use.
+        
+        Args:
+            table_names: Optional list of specific table names to include.
+                        If None, includes all tables from all files.
+        
+        Returns:
+            Combined schema string with all CREATE TABLE statements
+        """
+        schema_parts = []
+        
+        for database_name, schema_data in self.extracted_schemas.items():
+            schema_parts.append(f"-- Database: {database_name}")
+            schema_parts.append(f"-- Total tables: {schema_data['total_tables']}")
+            schema_parts.append("")
+            
+            for table_name, table_info in schema_data['table_schemas'].items():
+                # Filter by table_names if specified
+                if table_names is None or table_name in table_names:
+                    schema_parts.append(table_info['create_statement'])
+                    schema_parts.append("")
+        
+        if not schema_parts:
+            return "-- No schemas available. Please load SQL files first."
+        
+        return "\n".join(schema_parts)
+    
+    def get_schema_for_tables(self, table_names: List[str]) -> str:
+        """
+        Get schema string for specific tables.
+        
+        Args:
+            table_names: List of table names to get schemas for
+        
+        Returns:
+            Schema string with CREATE TABLE statements for specified tables
+        """
+        return self.get_combined_schema(table_names=table_names)
+    
+    def get_all_table_names(self) -> List[str]:
+        """Get list of all table names across all loaded schemas."""
+        table_names = []
+        for schema_data in self.extracted_schemas.values():
+            table_names.extend(schema_data['table_schemas'].keys())
+        return list(set(table_names))  # Remove duplicates
     
     def query(self, question: str, k: Optional[int] = None) -> Tuple[Any, str, List[dict]]:
         """Process a query and return the answer with sources."""
@@ -440,11 +747,20 @@ class SQLRAGSystem:
     
     def get_system_info(self) -> Dict[str, Any]:
         """Get system information and statistics."""
+        total_tables = sum(
+            schema_data['total_tables'] 
+            for schema_data in self.extracted_schemas.values()
+        )
+        
         return {
             'config': self.config.to_dict(),
             'num_documents': len(self.retriever.documents) if self.retriever.documents else 0,
             'index_built': self.retriever.index is not None,
-            'model_loaded': self.generator.generator is not None
+            'model_loaded': self.generator.generator is not None,
+            'num_schema_files': len(self.extracted_schemas),
+            'total_tables': total_tables,
+            'schema_cache_dir': str(self.schema_cache_dir),
+            'schema_cache_files': [f.name for f in self.schema_cache_dir.glob("*_schema.json")] if self.schema_cache_dir.exists() else []
         }
 
 

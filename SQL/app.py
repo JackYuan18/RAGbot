@@ -5,13 +5,78 @@ Flask application for querying SQL database schemas using RAG
 Similar to NSTSCE/app.py but specialized for SQL files
 """
 
-from flask import Flask, render_template, request, jsonify, send_file
 import sys
 import os
+import subprocess
+from pathlib import Path
+
+# Check if running in virtual environment and activate if not
+def ensure_venv():
+    """Ensure the script is running in the virtual environment."""
+    CURRENT_DIR = Path(__file__).resolve().parent
+    VENV_DIR = CURRENT_DIR / "venv"
+    VENV_PYTHON = VENV_DIR / "Scripts" / "python.exe" if os.name == 'nt' else VENV_DIR / "bin" / "python"
+    
+    # Check if venv exists
+    if not VENV_PYTHON.exists():
+        print(f"Warning: Virtual environment not found at {VENV_DIR}")
+        print("Please create it first with: python -m venv venv")
+        return False
+    
+    # Check if we're already running in the venv
+    # On Windows, check if sys.executable is in the venv directory
+    if os.name == 'nt':
+        # Windows
+        venv_python_path = str(VENV_PYTHON.resolve())
+        current_python = sys.executable
+        if venv_python_path.lower() != current_python.lower():
+            # Not running in venv, restart with venv's Python
+            print(f"Not running in virtual environment. Restarting with venv Python...")
+            print(f"Current Python: {current_python}")
+            print(f"Venv Python: {venv_python_path}")
+            try:
+                # Restart the script with venv's Python
+                subprocess.run([venv_python_path] + sys.argv, check=True)
+                sys.exit(0)
+            except subprocess.CalledProcessError as e:
+                print(f"Error restarting with venv Python: {e}")
+                return False
+    else:
+        # Unix/Linux/Mac
+        venv_python_path = str(VENV_PYTHON.resolve())
+        current_python = sys.executable
+        if venv_python_path != current_python:
+            # Not running in venv, restart with venv's Python
+            print(f"Not running in virtual environment. Restarting with venv Python...")
+            print(f"Current Python: {current_python}")
+            print(f"Venv Python: {venv_python_path}")
+            try:
+                # Restart the script with venv's Python
+                os.execv(venv_python_path, [venv_python_path] + sys.argv)
+            except Exception as e:
+                print(f"Error restarting with venv Python: {e}")
+                return False
+    
+    return True
+
+# Ensure virtual environment is active
+if not ensure_venv():
+    print("Failed to activate virtual environment. Continuing anyway...")
+
+from flask import Flask, render_template, request, jsonify, send_file
 import logging
 import webbrowser
 import threading
 import time
+import re
+
+# Set HuggingFace cache location to use shared cache
+# This ensures all Python environments use the same cache
+if 'HF_HOME' not in os.environ:
+    hf_cache = os.path.expanduser('~/.cache/huggingface')
+    os.environ['HF_HOME'] = hf_cache
+    logging.info(f"Set HF_HOME to: {hf_cache}")
+import json
 from pathlib import Path
 from datetime import datetime
 
@@ -25,6 +90,15 @@ sys.path.insert(0, str(PROJECT_ROOT / "RAGsystem"))
 
 from SQLRAGSystem import SQLRAGSystem, RAGConfig, setup_logging, check_gpu_availability
 from SQLExecutor import SQLCoderClient, SQLExecutor
+
+# Try to import DefogSQLCoderClient (optional, requires transformers)
+try:
+    from DefogSQLCoderClient import DefogSQLCoderClient
+    DEFOG_SQLCODER_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"DefogSQLCoderClient not available: {e}. Install transformers and torch to use Defog SQLCoder.")
+    DefogSQLCoderClient = None
+    DEFOG_SQLCODER_AVAILABLE = False
 
 # Try to import ChatGPT5Automation if it exists
 try:
@@ -43,9 +117,24 @@ except ImportError:
 sql_rag_system = None
 browser_opened = False
 
-# Initialize SQLCoder client and executors
-sqlcoder_client = SQLCoderClient()
+# Initialize SQLCoder clients and executors
+sqlcoder_client = SQLCoderClient()  # Ollama SQLCoder (default)
+defog_sqlcoder_client = None  # Defog SQLCoder (lazy loaded)
 sql_executors = {}  # Store SQLExecutor instances per SQL file
+current_sqlcoder_type = "ollama"  # "ollama" or "defog"
+
+def get_current_sqlcoder_client():
+    """Get the currently selected SQLCoder client."""
+    global defog_sqlcoder_client, current_sqlcoder_type
+    
+    if current_sqlcoder_type == "defog":
+        if not DEFOG_SQLCODER_AVAILABLE:
+            raise ImportError("Defog SQLCoder is not available. Install transformers and torch.")
+        if defog_sqlcoder_client is None:
+            defog_sqlcoder_client = DefogSQLCoderClient()
+        return defog_sqlcoder_client
+    else:
+        return sqlcoder_client
 
 def initialize_sql_rag_system():
     """Initialize the SQL RAG system with SQL files."""
@@ -116,6 +205,142 @@ def chat():
     
     return jsonify({'response': "Sorry, no message received.", 'sources': []})
 
+@app.route('/api/schemas/stored', methods=['GET'])
+def get_stored_schemas():
+    """Get information about stored schemas (internal use)."""
+    global sql_rag_system
+    
+    if sql_rag_system is None:
+        return jsonify({
+            'success': False,
+            'message': 'SQL RAG system not initialized'
+        })
+    
+    try:
+        schemas_info = []
+        for filename, schema_data in sql_rag_system.extracted_schemas.items():
+            schemas_info.append({
+                'filename': filename,
+                'file_path': str(schema_data['file_path']),
+                'total_tables': schema_data['total_tables'],
+                'table_names': list(schema_data['table_schemas'].keys()),
+                'file_size_mb': schema_data['file_size'] / (1024 * 1024)
+            })
+        
+        return jsonify({
+            'success': True,
+            'schemas': schemas_info,
+            'total_files': len(schemas_info),
+            'cache_dir': str(sql_rag_system.schema_cache_dir),
+            'cache_files': [f.name for f in sql_rag_system.schema_cache_dir.glob("*_schema.json")] if sql_rag_system.schema_cache_dir.exists() else []
+        })
+    except Exception as e:
+        logging.error(f"Error getting stored schemas: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        })
+
+@app.route('/api/schemas/extract/<filename>', methods=['POST'])
+def extract_schema_for_file(filename):
+    """Extract and store schema for a specific SQL file."""
+    global sql_rag_system
+    
+    if sql_rag_system is None:
+        return jsonify({
+            'success': False,
+            'message': 'SQL RAG system not initialized'
+        })
+    
+    try:
+        sql_file_path = CURRENT_DIR / filename
+        if not sql_file_path.exists():
+            return jsonify({
+                'success': False,
+                'message': f'SQL file not found: {filename}'
+            })
+        
+        # Parse the SQL file and extract schema
+        logging.info(f"Extracting schema for file: {filename}")
+        parsed = sql_rag_system.sql_processor.parse_sql_file(str(sql_file_path))
+        
+        if not parsed or not parsed.get('table_schemas'):
+            return jsonify({
+                'success': False,
+                'message': f'No table schemas found in {filename}. The file may not contain CREATE TABLE statements.'
+            })
+        
+        # Get database name from parsed data
+        # If not found, infer from filename (remove .sql extension and common suffixes)
+        database_name = parsed.get('database_name')
+        if not database_name:
+            # Infer from filename: remove .sql extension and common suffixes
+            filename_stem = Path(filename).stem  # Remove .sql extension
+            database_name = re.sub(r'_(database|db|sql|dump)$', '', filename_stem, flags=re.IGNORECASE)
+            database_name = re.sub(r'^(database|db|sql|dump)_', '', database_name, flags=re.IGNORECASE)
+            if not database_name:
+                database_name = filename_stem
+        
+        # Store the extracted schema using database name as key
+        sql_rag_system.extracted_schemas[database_name] = {
+            'filename': parsed['filename'],
+            'file_path': parsed['file_path'],
+            'file_size': parsed['file_size'],
+            'database_name': database_name,
+            'table_schemas': parsed['table_schemas'],
+            'total_tables': parsed['total_tables'],
+            'insert_info': parsed.get('insert_info', {})
+        }
+        
+        # Save to cache (individual file)
+        sql_rag_system._save_schema_to_cache(database_name)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Schema extracted successfully for {filename} (database: {database_name})',
+            'schema_info': {
+                'database_name': database_name,
+                'total_tables': parsed['total_tables'],
+                'table_names': list(parsed['table_schemas'].keys()),
+                'filename': filename
+            }
+        })
+    except Exception as e:
+        logging.error(f"Error extracting schema for {filename}: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Error extracting schema: {str(e)}'
+        })
+
+@app.route('/api/schemas/combined', methods=['GET'])
+def get_combined_schema():
+    """Get combined schema string for all stored schemas."""
+    global sql_rag_system
+    
+    if sql_rag_system is None:
+        return jsonify({
+            'success': False,
+            'message': 'SQL RAG system not initialized'
+        })
+    
+    try:
+        table_names = request.args.getlist('table_names')  # Optional query parameter
+        table_names = table_names if table_names else None
+        
+        schema = sql_rag_system.get_combined_schema(table_names=table_names)
+        
+        return jsonify({
+            'success': True,
+            'schema': schema,
+            'table_names': table_names or sql_rag_system.get_all_table_names()
+        })
+    except Exception as e:
+        logging.error(f"Error getting combined schema: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        })
+
 @app.route('/status')
 def status():
     """Check SQL RAG system status."""
@@ -140,18 +365,111 @@ def gpu_status():
     except Exception as e:
         return jsonify({'error': str(e)})
 
+@app.route('/api/schemas', methods=['GET'])
+def get_schemas():
+    """Get list of extracted schemas from schema_cache folder."""
+    try:
+        schemas = []
+        
+        if sql_rag_system:
+            # Get schema cache directory
+            cache_dir = sql_rag_system.schema_cache_dir
+            
+            # Ensure cache directory exists
+            if not cache_dir.exists():
+                logging.warning(f"Schema cache directory does not exist: {cache_dir}")
+                return jsonify({'schemas': [], 'error': f'Schema cache directory not found: {cache_dir}'})
+            
+            # Read all schema files directly from cache directory
+            schema_files = list(cache_dir.glob("*_schema.json"))
+            
+            if not schema_files:
+                logging.info(f"No schema files found in {cache_dir}")
+                return jsonify({'schemas': []})
+            
+            for schema_file in schema_files:
+                try:
+                    with open(schema_file, 'r', encoding='utf-8') as f:
+                        schema_data = json.load(f)
+                    
+                    # Use the filename (without extension) as schema_name
+                    schema_name = str(schema_file.stem)  # e.g., "fars_schema" - ensure it's a string
+                    database_name = schema_data.get('database_name', schema_name.replace('_schema', ''))
+                    
+                    # Ensure schema_name is set
+                    if not schema_name:
+                        schema_name = f"{database_name}_schema"
+                    
+                    # Final check: ensure schema_name is always set
+                    if not schema_name or schema_name == 'None':
+                        schema_name = f"{database_name}_schema" if database_name else schema_file.stem
+                    
+                    logging.info(f"Loading schema: file={schema_file.name}, schema_name={schema_name}, database_name={database_name}")
+                    
+                    schema_obj = {
+                        'database_name': database_name,
+                        'schema_name': schema_name,  # Use filename directly: "fars_schema"
+                        'filename': schema_data.get('filename', ''),
+                        'total_tables': schema_data.get('total_tables', 0),
+                        'table_names': list(schema_data.get('table_schemas', {}).keys()),
+                        'file_size': schema_data.get('file_size', 0),
+                        'file_size_mb': schema_data.get('file_size', 0) / (1024 * 1024)
+                    }
+                    
+                    # Double-check schema_name is in the object
+                    if 'schema_name' not in schema_obj or not schema_obj.get('schema_name'):
+                        schema_obj['schema_name'] = f"{database_name}_schema" if database_name else str(schema_file.stem)
+                    
+                    schemas.append(schema_obj)
+                except Exception as e:
+                    logging.warning(f"Failed to load schema file {schema_file}: {e}")
+                    continue
+        else:
+            logging.warning("SQL RAG system not initialized")
+            return jsonify({'schemas': [], 'error': 'SQL RAG system not initialized'})
+        
+        return jsonify({'schemas': schemas})
+    except Exception as e:
+        logging.error(f"Error getting schemas: {e}", exc_info=True)
+        return jsonify({'schemas': [], 'error': str(e)})
+
 @app.route('/api/sql/files', methods=['GET'])
 def get_sql_files():
-    """Get list of SQL files."""
+    """Get list of SQL files with schema extraction status."""
     try:
         sql_files = []
+        # Map database names to filenames
+        db_name_to_filename = {}
+        if sql_rag_system and sql_rag_system.extracted_schemas:
+            for db_name, schema_data in sql_rag_system.extracted_schemas.items():
+                filename = schema_data.get('filename', '')
+                if filename:
+                    db_name_to_filename[filename] = db_name
+        
         for sql_file in CURRENT_DIR.glob("*.sql"):
             stat = sql_file.stat()
+            filename = sql_file.name
+            database_name = db_name_to_filename.get(filename, None)
+            has_schema = database_name is not None
+            
+            # Get schema info if available
+            schema_info = None
+            if has_schema and sql_rag_system:
+                schema_data = sql_rag_system.extracted_schemas[database_name]
+                schema_info = {
+                    'database_name': database_name,
+                    'total_tables': schema_data.get('total_tables', 0),
+                    'table_names': list(schema_data.get('table_schemas', {}).keys())
+                }
+            
             sql_files.append({
-                'name': sql_file.name,
+                'name': filename,
                 'size': stat.st_size,
                 'size_mb': stat.st_size / (1024 * 1024),
-                'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M')
+                'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M'),
+                'schema_extracted': has_schema,
+                'database_name': database_name,
+                'schema_info': schema_info
             })
         
         return jsonify({'files': sql_files})
@@ -363,31 +681,99 @@ def validate_chatgpt5_api_key():
 
 @app.route('/api/sqlcoder/status', methods=['GET'])
 def sqlcoder_status():
-    """Check SQLCoder/Ollama availability."""
+    """Check SQLCoder availability."""
     try:
-        available, message = sqlcoder_client.check_availability()
+        client = get_current_sqlcoder_client()
+        available, message = client.check_availability()
         # Format message for HTML display (convert newlines to <br>)
         formatted_message = message.replace('\n', '<br>')
         return jsonify({
             'available': available,
             'message': message,
-            'formatted_message': formatted_message
+            'formatted_message': formatted_message,
+            'type': current_sqlcoder_type
         })
     except Exception as e:
         error_msg = f'Error checking SQLCoder: {str(e)}'
+        logging.error(f"Error checking SQLCoder status: {e}", exc_info=True)
         return jsonify({
             'available': False,
             'message': error_msg,
-            'formatted_message': error_msg
+            'formatted_message': error_msg,
+            'type': current_sqlcoder_type
         })
+
+@app.route('/api/sqlcoder/type', methods=['GET', 'POST'])
+def sqlcoder_type():
+    """Get or set the SQLCoder type (ollama or defog)."""
+    global current_sqlcoder_type, defog_sqlcoder_client
+    
+    if request.method == 'GET':
+        return jsonify({
+            'type': current_sqlcoder_type,
+            'available_types': ['ollama', 'defog']
+        })
+    
+    # POST - set SQLCoder type
+    try:
+        data = request.get_json()
+        new_type = data.get('type', 'ollama')
+        
+        if new_type not in ['ollama', 'defog']:
+            return jsonify({
+                'success': False,
+                'message': f'Invalid SQLCoder type: {new_type}. Must be "ollama" or "defog"'
+            }), 400
+        
+        current_sqlcoder_type = new_type
+        
+        # Initialize Defog client if switching to it
+        if new_type == 'defog':
+            if not DEFOG_SQLCODER_AVAILABLE:
+                return jsonify({
+                    'success': False,
+                    'message': 'Defog SQLCoder is not available. Please install required dependencies: pip install transformers torch'
+                }), 400
+            
+            if defog_sqlcoder_client is None:
+                try:
+                    defog_sqlcoder_client = DefogSQLCoderClient()
+                    logging.info("Defog SQLCoder client initialized")
+                except Exception as e:
+                    logging.error(f"Failed to initialize Defog SQLCoder: {e}", exc_info=True)
+                    error_msg = str(e)
+                    # If it's a connection/model download error, provide helpful instructions
+                    if "Failed to connect" in error_msg or "not found" in error_msg or "couldn't find it" in error_msg:
+                        return jsonify({
+                            'success': False,
+                            'message': error_msg  # Already contains download instructions
+                        }), 500
+                    else:
+                        return jsonify({
+                            'success': False,
+                            'message': f'Failed to initialize Defog SQLCoder: {error_msg}\n\nMake sure transformers and torch are installed: pip install transformers torch'
+                        }), 500
+        
+        return jsonify({
+            'success': True,
+            'type': current_sqlcoder_type,
+            'message': f'SQLCoder type set to {current_sqlcoder_type}'
+        })
+    except Exception as e:
+        logging.error(f"Error setting SQLCoder type: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': f'Error setting SQLCoder type: {str(e)}'
+        }), 500
 
 @app.route('/api/sqlcoder/generate', methods=['POST'])
 def generate_sql():
-    """Generate SQL query from natural language using SQLCoder."""
+    """Generate SQL query from natural language using SQLCoder with stored schemas."""
     try:
         data = request.get_json()
         question = data.get('question', '')
         filename = data.get('filename', '')
+        table_names = data.get('table_names', None)  # Optional: specific tables to use
         
         if not question:
             return jsonify({
@@ -395,51 +781,71 @@ def generate_sql():
                 'message': 'Question is required'
             })
         
-        if not filename:
-            return jsonify({
-                'success': False,
-                'message': 'SQL filename is required'
-            })
+        # Try to get schema from SQLRAGSystem first (stored schemas)
+        schema = None
+        schema_source = None
         
-        # Get or create SQLExecutor for this file
-        sql_file_path = CURRENT_DIR / filename
-        if not sql_file_path.exists():
-            return jsonify({
-                'success': False,
-                'message': f'SQL file not found: {filename}'
-            })
+        if sql_rag_system and sql_rag_system.extracted_schemas:
+            # Use stored schemas from SQLRAGSystem
+            if filename:
+                # Get schema for specific file
+                if filename in sql_rag_system.extracted_schemas:
+                    schema = sql_rag_system.get_schema_for_tables(
+                        list(sql_rag_system.extracted_schemas[filename]['table_schemas'].keys())
+                    )
+                    schema_source = f"stored_schema_{filename}"
+                else:
+                    logging.warning(f"Filename {filename} not found in stored schemas, using all schemas")
+                    schema = sql_rag_system.get_combined_schema(table_names=table_names)
+                    schema_source = "stored_schema_all"
+            else:
+                # Use all stored schemas
+                schema = sql_rag_system.get_combined_schema(table_names=table_names)
+                schema_source = "stored_schema_all"
         
-        # Load database if not already loaded
-        if filename not in sql_executors:
-            logging.info(f"Loading SQL file into database: {filename}")
-            executor = SQLExecutor(str(sql_file_path))
-            success, message = executor.load_sql_file_into_db()
-            if not success:
+        # Fallback: Get schema from SQLExecutor if stored schemas not available
+        if not schema and filename:
+            logging.info("Stored schemas not available, falling back to SQLExecutor")
+            sql_file_path = CURRENT_DIR / filename
+            if not sql_file_path.exists():
                 return jsonify({
                     'success': False,
-                    'message': f'Failed to load SQL file: {message}'
+                    'message': f'SQL file not found: {filename}'
                 })
-            sql_executors[filename] = executor
+            
+            # Load database if not already loaded
+            if filename not in sql_executors:
+                logging.info(f"Loading SQL file into database: {filename}")
+                executor = SQLExecutor(str(sql_file_path))
+                success, message = executor.load_sql_file_into_db()
+                if not success:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Failed to load SQL file: {message}'
+                    })
+                sql_executors[filename] = executor
+            
+            executor = sql_executors[filename]
+            schema = executor.get_schema()
+            schema_source = "executor_schema"
         
-        executor = sql_executors[filename]
-        
-        # Get database schema
-        schema = executor.get_schema()
         if not schema:
             return jsonify({
                 'success': False,
-                'message': 'Could not retrieve database schema'
+                'message': 'Could not retrieve database schema. Please load SQL files first.'
             })
         
         # Generate SQL using SQLCoder
-        logging.info(f"Generating SQL for question: {question}")
-        success, sql_query = sqlcoder_client.generate_sql(question, schema)
+        client = get_current_sqlcoder_client()
+        logging.info(f"Generating SQL for question: {question} (using {schema_source}, SQLCoder: {current_sqlcoder_type})")
+        success, sql_query = client.generate_sql(question, schema)
         
         if success:
             return jsonify({
                 'success': True,
                 'sql_query': sql_query,
-                'message': 'SQL query generated successfully'
+                'message': 'SQL query generated successfully',
+                'schema_source': schema_source
             })
         else:
             return jsonify({
@@ -454,115 +860,95 @@ def generate_sql():
             'message': f'Error generating SQL: {str(e)}'
         })
 
-@app.route('/api/sql/execute', methods=['POST'])
-def execute_sql():
-    """Execute SQL query against the database and return results."""
-    try:
-        data = request.get_json()
-        sql_query = data.get('sql_query', '')
-        filename = data.get('filename', '')
-        
-        if not sql_query:
-            return jsonify({
-                'success': False,
-                'message': 'SQL query is required'
-            })
-        
-        if not filename or filename not in sql_executors:
-            return jsonify({
-                'success': False,
-                'message': 'SQL file not loaded. Please generate SQL first.'
-            })
-        
-        executor = sql_executors[filename]
-        
-        # Check if database connection is still valid
-        if not executor.conn:
-            logging.warning(f"Database connection lost for {filename}, reloading...")
-            sql_file_path = CURRENT_DIR / filename
-            executor = SQLExecutor(str(sql_file_path))
-            success, message = executor.load_sql_file_into_db()
-            if not success:
-                return jsonify({
-                    'success': False,
-                    'message': f'Failed to reload database: {message}'
-                })
-            sql_executors[filename] = executor
-        
-        # Execute query
-        logging.info(f"Executing SQL query: {sql_query[:200]}...")
-        success, results, error = executor.execute_query(sql_query)
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'results': results,
-                'message': f'Query executed successfully, returned {results.get("row_count", 0)} rows'
-            })
-        else:
-            error_msg = error or 'Unknown error executing query'
-            logging.error(f"SQL execution failed: {error_msg}")
-            return jsonify({
-                'success': False,
-                'message': error_msg,
-                'sql_query': sql_query
-            })
-            
-    except Exception as e:
-        error_msg = f'Error executing SQL: {str(e)}'
-        logging.error(error_msg, exc_info=True)
-        return jsonify({
-            'success': False,
-            'message': error_msg
-        })
+# SQL execution endpoint removed - execution functionality disabled
+# @app.route('/api/sql/execute', methods=['POST'])
+# def execute_sql():
+#     """Execute SQL query - DISABLED"""
+#     return jsonify({
+#         'success': False,
+#         'message': 'SQL execution functionality has been disabled'
+#     }), 403
 
 @app.route('/api/sqlcoder/generate-and-execute', methods=['POST'])
 def generate_and_execute_sql():
-    """Generate SQL from natural language and execute it in one step."""
+    """Generate SQL from natural language (execution disabled)."""
     try:
         data = request.get_json()
         question = data.get('question', '')
-        filename = data.get('filename', '')
+        database_name = data.get('database_name', '')  # Changed from filename to database_name
+        table_names = data.get('table_names', None)
         
-        if not question or not filename:
+        if not question:
             return jsonify({
                 'success': False,
-                'message': 'Question and filename are required'
+                'message': 'Question is required'
             })
         
-        # Get or create SQLExecutor for this file
-        sql_file_path = CURRENT_DIR / filename
-        if not sql_file_path.exists():
-            return jsonify({
-                'success': False,
-                'message': f'SQL file not found: {filename}'
-            })
+        # Try to get schema from SQLRAGSystem first (stored schemas)
+        schema = None
+        schema_source = None
         
-        # Load database if not already loaded
-        if filename not in sql_executors:
-            logging.info(f"Loading SQL file into database: {filename}")
-            executor = SQLExecutor(str(sql_file_path))
-            success, message = executor.load_sql_file_into_db()
-            if not success:
-                return jsonify({
-                    'success': False,
-                    'message': f'Failed to load SQL file: {message}'
-                })
-            sql_executors[filename] = executor
+        if sql_rag_system and sql_rag_system.extracted_schemas:
+            # Use stored schemas from SQLRAGSystem
+            if database_name:
+                if database_name in sql_rag_system.extracted_schemas:
+                    schema = sql_rag_system.get_schema_for_tables(
+                        list(sql_rag_system.extracted_schemas[database_name]['table_schemas'].keys())
+                    )
+                    schema_source = f"stored_schema_{database_name}"
+                else:
+                    schema = sql_rag_system.get_combined_schema(table_names=table_names)
+                    schema_source = "stored_schema_all"
+            else:
+                schema = sql_rag_system.get_combined_schema(table_names=table_names)
+                schema_source = "stored_schema_all"
         
-        executor = sql_executors[filename]
+        # Fallback: Get schema from SQLExecutor if stored schemas not available
+        # Try to find filename from database_name
+        if not schema and database_name:
+            # Find the SQL file that corresponds to this database name
+            filename = None
+            if sql_rag_system and sql_rag_system.extracted_schemas:
+                for db_name, schema_data in sql_rag_system.extracted_schemas.items():
+                    if db_name == database_name:
+                        filename = schema_data.get('filename', '')
+                        break
+            
+            if filename:
+                logging.info("Stored schemas not available, falling back to SQLExecutor")
+                sql_file_path = CURRENT_DIR / filename
+                if not sql_file_path.exists():
+                    return jsonify({
+                        'success': False,
+                        'message': f'SQL file not found: {filename}'
+                    })
+                
+                # Load database if not already loaded (only for schema extraction)
+                if filename not in sql_executors:
+                    logging.info(f"Loading SQL file into database for schema extraction: {filename}")
+                    executor = SQLExecutor(str(sql_file_path))
+                    success, message = executor.load_sql_file_into_db()
+                    if not success:
+                        return jsonify({
+                            'success': False,
+                            'message': f'Failed to load SQL file: {message}'
+                        })
+                    sql_executors[filename] = executor
+                
+                executor = sql_executors[filename]
+                schema = executor.get_schema()
+                schema_source = "executor_schema"
         
-        # Get database schema
-        schema = executor.get_schema()
         if not schema:
             return jsonify({
                 'success': False,
-                'message': 'Could not retrieve database schema'
+                'message': 'Could not retrieve database schema. Please extract schema first.'
             })
         
         # Generate SQL using SQLCoder
-        logging.info(f"Generating SQL for question: {question}")
-        success, sql_query = sqlcoder_client.generate_sql(question, schema)
+        client = get_current_sqlcoder_client()
+        logging.info(f"Generating SQL for question: {question} (using {schema_source}, SQLCoder: {current_sqlcoder_type})")
+        success, sql_query = client.generate_sql(question, schema)
         
         if not success:
             return jsonify({
@@ -570,42 +956,18 @@ def generate_and_execute_sql():
                 'message': sql_query  # sql_query contains error message here
             })
         
-        # For generate-and-execute, check if execute flag is set
-        should_execute = data.get('execute', False)
-        
-        if should_execute:
-            # Execute the generated SQL
-            logging.info(f"Executing generated SQL: {sql_query[:200]}...")
-            exec_success, results, error = executor.execute_query(sql_query)
-            
-            if exec_success:
-                return jsonify({
-                    'success': True,
-                    'sql_query': sql_query,
-                    'results': results,
-                    'message': f'Query executed successfully, returned {results.get("row_count", 0)} rows'
-                })
-            else:
-                # SQL was generated but execution failed
-                error_msg = error or 'Unknown error executing query'
-                logging.error(f"SQL execution failed: {error_msg}")
-                return jsonify({
-                    'success': False,
-                    'sql_query': sql_query,
-                    'message': f'SQL generated but execution failed: {error_msg}',
-                    'results': None
-                })
-        else:
-            # Just return the generated SQL without executing
-            return jsonify({
-                'success': True,
-                'sql_query': sql_query,
-                'results': None,
-                'message': 'SQL query generated successfully. Click "Execute SQL" to run it.'
-            })
+        # SQL execution functionality has been disabled
+        # Always return just the generated SQL without executing
+        return jsonify({
+            'success': True,
+            'sql_query': sql_query,
+            'results': None,
+            'message': 'SQL query generated successfully.',
+            'schema_source': schema_source
+        })
             
     except Exception as e:
-        error_msg = f'Error in generate-and-execute: {str(e)}'
+        error_msg = f'Error generating SQL: {str(e)}'
         logging.error(error_msg, exc_info=True)
         return jsonify({
             'success': False,

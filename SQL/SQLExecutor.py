@@ -396,14 +396,18 @@ class SQLExecutor:
     
     def execute_query(self, sql_query: str) -> Tuple[bool, Any, Optional[str]]:
         """
-        Execute SQL query against the database.
+        Execute SQL query against the database - DISABLED.
+        
+        This functionality has been disabled. This method always returns an error.
         
         Args:
-            sql_query: SQL query to execute
+            sql_query: SQL query to execute (ignored)
             
         Returns:
-            Tuple of (success, results_or_error_message, error_message_if_failed)
+            Tuple of (False, None, error_message)
         """
+        self.logger.warning("SQL execution attempted but functionality is disabled")
+        return False, None, "SQL execution functionality has been disabled"
         try:
             if not self.conn:
                 return False, None, "Database not loaded. Please load SQL file first."

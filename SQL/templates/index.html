@@ -163,21 +163,29 @@
                 
                 <!-- SQLCoder Options (hidden by default) -->
                 <div id="sqlcoder-options" class="hidden flex flex-col space-y-2">
+                    <!-- SQLCoder Type Selection -->
+                    <div class="flex items-center space-x-2 mb-2">
+                        <label class="text-xs text-gray-600">SQLCoder Type:</label>
+                        <select id="sqlcoder-type-select" class="flex-1 p-2 border rounded text-sm">
+                            <option value="ollama">Ollama SQLCoder</option>
+                            <option value="defog">Defog SQLCoder</option>
+                        </select>
+                    </div>
                     <div class="flex items-center space-x-2">
                         <select id="sql-file-select" class="flex-1 p-2 border rounded text-sm">
-                            <option value="">Select SQL file...</option>
+                            <option value="">Select database schema...</option>
                         </select>
                         <button id="generate-sql-btn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm">
                             <i class="fas fa-code"></i> Generate SQL
                         </button>
                     </div>
-                    <!-- Generated SQL Display and Execute Button (hidden initially) -->
+                    <!-- Generated SQL Display and Copy Button (hidden initially) -->
                     <div id="generated-sql-section" class="hidden">
                         <div class="bg-gray-50 border rounded-lg p-3">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-sm font-semibold text-gray-700">Generated SQL:</span>
-                                <button id="execute-sql-btn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm">
-                                    <i class="fas fa-play"></i> Execute SQL
+                                <button id="copy-sql-btn" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm">
+                                    <i class="fas fa-copy"></i> Copy SQL
                                 </button>
                             </div>
                             <pre id="generated-sql-query" class="bg-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto max-h-40 overflow-y-auto"></pre>
@@ -214,6 +222,7 @@
         let currentQueryMode = 'rag';
         let lastGeneratedSQL = null;
         let lastSelectedFilename = null;
+        let current_sqlcoder_type = 'ollama';
 
         // DOM elements
         const chatMessages = document.getElementById('chat-messages');
@@ -236,11 +245,12 @@
         const notificationMessage = document.getElementById('notification-message');
         const sqlcoderStatus = document.getElementById('sqlcoder-status');
         const sqlcoderOptions = document.getElementById('sqlcoder-options');
+        const sqlcoderTypeSelect = document.getElementById('sqlcoder-type-select');
         const sqlFileSelect = document.getElementById('sql-file-select');
         const generateSqlBtn = document.getElementById('generate-sql-btn');
         const generatedSqlSection = document.getElementById('generated-sql-section');
         const generatedSqlQuery = document.getElementById('generated-sql-query');
-        const executeSqlBtn = document.getElementById('execute-sql-btn');
+        const copySqlBtn = document.getElementById('copy-sql-btn');
 
         // Sidebar toggle
         sidebarToggle.addEventListener('click', () => {
@@ -280,47 +290,92 @@
                 const response = await fetch('/api/sqlcoder/status');
                 const data = await response.json();
                 sqlcoderStatus.classList.remove('hidden');
+                
+                // Update the type selector to match current type
+                if (data.type && sqlcoderTypeSelect) {
+                    sqlcoderTypeSelect.value = data.type;
+                    current_sqlcoder_type = data.type;
+                }
+                
                 if (data.available) {
-                    sqlcoderStatus.innerHTML = '<p class="text-green-600">✓ SQLCoder available</p>';
+                    sqlcoderStatus.innerHTML = `<p class="text-green-600">✓ SQLCoder (${data.type || 'ollama'}) available</p>`;
                 } else {
                     // Show formatted message with better styling
                     const message = data.formatted_message || data.message || 'SQLCoder not available';
+                    const sqlcoderType = data.type || 'ollama';
                     sqlcoderStatus.innerHTML = `
                         <div class="text-red-600">
-                            <p class="font-semibold mb-1">✗ SQLCoder not available</p>
+                            <p class="font-semibold mb-1">✗ SQLCoder (${sqlcoderType}) not available</p>
                             <div class="text-xs bg-red-50 p-2 rounded border border-red-200 whitespace-pre-line">${message}</div>
+                            ${sqlcoderType === 'ollama' ? `
                             <div class="text-xs mt-2 text-gray-600">
                                 <strong>Quick Setup:</strong><br>
                                 1. Install: <code class="bg-gray-200 px-1 rounded">curl https://ollama.ai/install.sh | sh</code><br>
                                 2. Start: <code class="bg-gray-200 px-1 rounded">ollama serve</code><br>
                                 3. Install model: <code class="bg-gray-200 px-1 rounded">ollama pull sqlcoder</code>
                             </div>
+                            ` : `
+                            <div class="text-xs mt-2 text-gray-600">
+                                <strong>Defog SQLCoder Setup:</strong><br>
+                                Requires transformers library and GPU (recommended) or CPU support.
+                            </div>
+                            `}
                         </div>
                     `;
                 }
             } catch (error) {
+                console.error('Error checking SQLCoder status:', error);
                 sqlcoderStatus.classList.remove('hidden');
                 sqlcoderStatus.innerHTML = `
                     <div class="text-red-600">
-                        <p>✗ Error checking SQLCoder</p>
-                        <div class="text-xs mt-1">${error.message}</div>
+                        <p>✗ Error checking SQLCoder status</p>
                     </div>
                 `;
             }
+        }
+
+        // Handle SQLCoder type change
+        if (sqlcoderTypeSelect) {
+            sqlcoderTypeSelect.addEventListener('change', async (e) => {
+                const newType = e.target.value;
+                try {
+                    const response = await fetch('/api/sqlcoder/type', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({type: newType})
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        showNotification(`Switched to ${newType} SQLCoder`, 'success');
+                        current_sqlcoder_type = newType;
+                        // Refresh status (don't reload schemas, just check status)
+                        await checkSQLCoderStatus();
+                    } else {
+                        showNotification(`Failed to switch SQLCoder: ${data.message}`, 'error');
+                        // Revert selection
+                        e.target.value = current_sqlcoder_type || 'ollama';
+                    }
+                } catch (error) {
+                    console.error('Error switching SQLCoder type:', error);
+                    showNotification('Error switching SQLCoder type', 'error');
+                    // Revert selection
+                    e.target.value = current_sqlcoder_type || 'ollama';
+                }
+            });
         }
         
         // Generate SQL button
         generateSqlBtn.addEventListener('click', async () => {
             const question = userInput.value.trim();
-            const filename = sqlFileSelect.value;
+            const database_name = sqlFileSelect.value;  // Changed from filename to database_name
             
             if (!question) {
                 showNotification('Please enter a question', 'error');
                 return;
             }
             
-            if (!filename) {
-                showNotification('Please select a SQL file', 'error');
+            if (!database_name) {
+                showNotification('Please select a database schema', 'error');
                 return;
             }
             
@@ -337,7 +392,7 @@
                 const response = await fetch('/api/sqlcoder/generate-and-execute', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({question, filename, execute: false})
+                    body: JSON.stringify({question, database_name, execute: false})
                 });
                 
                 const data = await response.json();
@@ -346,7 +401,7 @@
                 if (data.success && data.sql_query) {
                     // Store generated SQL for execution
                     lastGeneratedSQL = data.sql_query;
-                    lastSelectedFilename = filename;
+                    lastSelectedFilename = database_name;
                     
                     // Display generated SQL in the section
                     generatedSqlQuery.textContent = data.sql_query;
@@ -360,11 +415,11 @@
                         <div class="bg-gray-200 text-gray-800 inline-block max-w-3xl p-3 rounded-lg">
                             <div class="mb-2">
                                 <strong>Generated SQL Query:</strong>
-                                <pre class="bg-gray-800 text-green-400 p-3 rounded mt-2 text-xs overflow-x-auto max-h-60 overflow-y-auto">${data.sql_query.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+                                <pre id="chat-sql-query-${Date.now()}" class="bg-gray-800 text-green-400 p-3 rounded mt-2 text-xs overflow-x-auto max-h-60 overflow-y-auto">${data.sql_query.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
                             </div>
                             <div class="text-sm text-gray-600 mb-2">${data.message || 'SQL query generated successfully'}</div>
-                            <button onclick="executeGeneratedSQL()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm mt-2">
-                                <i class="fas fa-play"></i> Execute SQL Query
+                            <button onclick="copySQLFromChat('${data.sql_query.replace(/'/g, "\\'").replace(/\n/g, '\\n')}')" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm mt-2">
+                                <i class="fas fa-copy"></i> Copy SQL Query
                             </button>
                         </div>
                     `;
@@ -374,7 +429,7 @@
                     chatMessages.appendChild(msgDiv);
                     chatMessages.scrollTop = chatMessages.scrollHeight;
                     
-                    showNotification('SQL query generated successfully. Click "Execute SQL Query" to run it.', 'success');
+                    showNotification('SQL query generated successfully. Click "Copy SQL" to copy it.', 'success');
                 } else {
                     addMessage(`Error: ${data.message}`, 'assistant');
                     showNotification(data.message, 'error');
@@ -389,111 +444,73 @@
             }
         });
         
-        // Execute SQL button
-        executeSqlBtn.addEventListener('click', () => {
-            if (lastGeneratedSQL && lastSelectedFilename) {
-                executeGeneratedSQL();
+        // Copy SQL button
+        copySqlBtn.addEventListener('click', () => {
+            if (lastGeneratedSQL) {
+                copySQLToClipboard(lastGeneratedSQL);
             } else {
-                showNotification('No SQL query to execute. Please generate SQL first.', 'error');
+                showNotification('No SQL query to copy. Please generate SQL first.', 'error');
             }
         });
         
-        // Execute generated SQL function
-        async function executeGeneratedSQL() {
-            if (!lastGeneratedSQL || !lastSelectedFilename) {
-                showNotification('No SQL query to execute', 'error');
+        // Copy SQL to clipboard function
+        function copySQLToClipboard(sqlText) {
+            if (!sqlText) {
+                showNotification('No SQL query to copy', 'error');
                 return;
             }
             
-            executeSqlBtn.disabled = true;
-            executeSqlBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Executing...';
-            
-            const loadingId = addMessage('Executing SQL query...', 'assistant', true);
-            
-            try {
-                const response = await fetch('/api/sql/execute', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        sql_query: lastGeneratedSQL,
-                        filename: lastSelectedFilename
-                    })
-                });
+            // Use the Clipboard API
+            navigator.clipboard.writeText(sqlText).then(() => {
+                // Visual feedback
+                const originalText = copySqlBtn.innerHTML;
+                copySqlBtn.disabled = true;
+                copySqlBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                copySqlBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
+                copySqlBtn.classList.add('bg-green-600');
                 
-                const data = await response.json();
-                document.getElementById(loadingId).remove();
+                showNotification('SQL query copied to clipboard!', 'success');
                 
-                if (data.success && data.results) {
-                    // Display SQL results in chat
-                    displaySQLResults(lastGeneratedSQL, data.results, data.message);
-                    showNotification(`Query executed successfully. Returned ${data.results.row_count || 0} rows.`, 'success');
-                } else {
-                    addMessage(`Execution Error: ${data.message}`, 'assistant');
-                    showNotification(data.message, 'error');
+                // Reset button after 2 seconds
+                setTimeout(() => {
+                    copySqlBtn.disabled = false;
+                    copySqlBtn.innerHTML = originalText;
+                    copySqlBtn.classList.remove('bg-green-600');
+                    copySqlBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy SQL:', err);
+                // Fallback: select text and show manual copy message
+                const textArea = document.createElement('textarea');
+                textArea.value = sqlText;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showNotification('SQL query copied to clipboard!', 'success');
+                } catch (fallbackErr) {
+                    showNotification('Failed to copy. Please select and copy manually.', 'error');
                 }
-            } catch (error) {
-                document.getElementById(loadingId).remove();
-                addMessage('Error executing SQL', 'assistant');
-                showNotification('Error executing SQL', 'error');
-            } finally {
-                executeSqlBtn.disabled = false;
-                executeSqlBtn.innerHTML = '<i class="fas fa-play"></i> Execute SQL';
-            }
+                document.body.removeChild(textArea);
+            });
         }
         
-        // Make executeGeneratedSQL available globally
-        window.executeGeneratedSQL = executeGeneratedSQL;
-        
-        // Display SQL results
-        function displaySQLResults(sqlQuery, results, message) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'mb-4 text-left';
-            
-            let html = `
-                <div class="bg-gray-200 text-gray-800 inline-block max-w-3xl p-3 rounded-lg">
-                    <div class="mb-2">
-                        <strong>Generated SQL:</strong>
-                        <pre class="bg-gray-800 text-green-400 p-3 rounded mt-2 text-xs overflow-x-auto"><code>${sqlQuery.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
-                    </div>
-                    <div class="text-sm text-gray-600 mb-2">${message}</div>
-                </div>
-            `;
-            
-            if (results && results.rows && results.rows.length > 0) {
-                html += `
-                    <div class="mt-3 bg-white border rounded-lg shadow-md overflow-x-auto max-w-3xl">
-                        <div class="p-2 bg-gray-50 border-b">
-                            <strong>Query Results:</strong> ${results.row_count} row${results.row_count !== 1 ? 's' : ''}
-                        </div>
-                        <table class="min-w-full divide-y divide-gray-200 text-xs">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    ${results.columns.map(col => `<th class="px-4 py-2 text-left font-semibold text-gray-700">${col}</th>`).join('')}
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                ${results.rows.slice(0, 100).map(row => `
-                                    <tr class="hover:bg-gray-50">
-                                        ${results.columns.map(col => `<td class="px-4 py-2 text-gray-700">${row[col] !== null ? String(row[col]) : 'NULL'}</td>`).join('')}
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                        ${results.row_count > 100 ? `<div class="p-2 bg-gray-50 text-xs text-gray-600">Showing first 100 of ${results.row_count} rows</div>` : ''}
-                    </div>
-                `;
-            } else if (results) {
-                html += `
-                    <div class="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-                        Query executed successfully but returned no rows.
-                    </div>
-                `;
-            }
-            
-            messageDiv.innerHTML = html;
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+        // Copy SQL from chat message (for buttons in chat)
+        function copySQLFromChat(sqlText) {
+            // Decode HTML entities and unescape
+            const decodedSQL = sqlText
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&amp;/g, '&')
+                .replace(/\\n/g, '\n')
+                .replace(/\\'/g, "'");
+            copySQLToClipboard(decodedSQL);
         }
+        
+        // Make copySQLFromChat available globally
+        window.copySQLFromChat = copySQLFromChat;
 
         // Validate API key
         validateApiBtn.addEventListener('click', async () => {
@@ -568,26 +585,50 @@
                 sqlFiles = data.files || [];
                 
                 if (sqlFiles.length > 0) {
-                    sqlFilesList.innerHTML = sqlFiles.map(file => `
-                        <div class="file-item p-2 border rounded cursor-pointer" onclick="selectFile('${file.name}')">
-                            <div class="flex items-center space-x-2">
-                                <i class="fas fa-database text-blue-500"></i>
-                                <span class="text-sm text-gray-700 font-medium">${file.name}</span>
+                    sqlFilesList.innerHTML = sqlFiles.map(file => {
+                        const schemaStatus = file.schema_extracted 
+                            ? `<span class="text-green-600 text-xs flex items-center">
+                                <i class="fas fa-check-circle mr-1"></i>
+                                Schema extracted (${file.schema_info?.total_tables || 0} tables)
+                               </span>`
+                            : `<span class="text-gray-500 text-xs flex items-center">
+                                <i class="fas fa-times-circle mr-1"></i>
+                                Schema not extracted
+                               </span>`;
+                        
+                        return `
+                        <div class="file-item p-3 border rounded hover:bg-gray-50">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center space-x-2 cursor-pointer" onclick="selectFile('${file.name}', event)">
+                                    <i class="fas fa-database text-blue-500"></i>
+                                    <span class="text-sm text-gray-700 font-medium">${file.name}</span>
+                                </div>
+                                <button 
+                                    onclick="extractSchema('${file.name}', this)" 
+                                    class="px-2 py-1 text-xs rounded ${file.schema_extracted ? 'bg-gray-200 text-gray-600 hover:bg-gray-300' : 'bg-blue-500 text-white hover:bg-blue-600'} transition-colors"
+                                    ${file.schema_extracted ? 'title="Re-extract schema"' : 'title="Extract schema"'}
+                                >
+                                    <i class="fas fa-${file.schema_extracted ? 'sync-alt' : 'download'} mr-1"></i>
+                                    ${file.schema_extracted ? 'Re-extract' : 'Extract'}
+                                </button>
                             </div>
-                            <div class="text-xs text-gray-500 mt-1">
+                            <div class="text-xs text-gray-500 mb-1">
                                 ${file.size_mb.toFixed(2)} MB • Modified: ${file.modified}
                             </div>
+                            <div>
+                                ${schemaStatus}
+                            </div>
                         </div>
-                    `).join('');
+                    `;
+                    }).join('');
                     fileCount.textContent = `${sqlFiles.length} file${sqlFiles.length !== 1 ? 's' : ''}`;
                     
-                    // Populate SQL file select dropdown
-                    sqlFileSelect.innerHTML = '<option value="">Select SQL file...</option>' + 
-                        sqlFiles.map(file => `<option value="${file.name}">${file.name} (${file.size_mb.toFixed(2)} MB)</option>`).join('');
+                    // Populate schema select dropdown with extracted schemas
+                    await loadSchemas();
                 } else {
                     sqlFilesList.innerHTML = '<div class="text-gray-500 text-sm">No SQL files found in SQL directory</div>';
                     fileCount.textContent = '0 files';
-                    sqlFileSelect.innerHTML = '<option value="">No SQL files available</option>';
+                    sqlFileSelect.innerHTML = '<option value="">No database schemas available</option>';
                 }
             } catch (error) {
                 console.error('Error loading SQL files:', error);
@@ -595,13 +636,108 @@
             }
         }
 
+        // Load schemas for dropdown
+        async function loadSchemas() {
+            try {
+                const response = await fetch('/api/schemas');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Check if there's an error in the response
+                if (data.error) {
+                    console.error('Backend error:', data.error);
+                    sqlFileSelect.innerHTML = `<option value="">Error: ${data.error}</option>`;
+                    return;
+                }
+                
+                const schemas = data.schemas || [];
+                
+                // Debug: log the schemas to see what we're getting
+                console.log('Schemas received:', schemas);
+                
+                if (schemas.length > 0) {
+                    sqlFileSelect.innerHTML = '<option value="">Select database schema...</option>' + 
+                        schemas.map(schema => {
+                            // Use schema_name directly from the API (which is the filename from schema_cache folder)
+                            // schema_name should be set by the backend from the filename
+                            let schemaName = schema.schema_name;
+                            
+                            // Fallback: construct from database_name or filename
+                            if (!schemaName) {
+                                console.warn('schema_name is missing! Schema object:', schema);
+                                if (schema.database_name) {
+                                    schemaName = `${schema.database_name}_schema`;
+                                } else if (schema.filename) {
+                                    // Extract from filename (remove .sql extension)
+                                    const name = schema.filename.replace(/\.sql$/, '');
+                                    schemaName = `${name}_schema`;
+                                } else {
+                                    schemaName = 'unknown_schema';
+                                }
+                            }
+                            
+                            const dbName = schema.database_name || schema.filename?.replace(/\.sql$/, '') || 'unknown';
+                            return `<option value="${dbName}">${schemaName} (${schema.total_tables || 0} tables)</option>`;
+                        }).join('');
+                } else {
+                    sqlFileSelect.innerHTML = '<option value="">No database schemas available. Extract schema first.</option>';
+                }
+            } catch (error) {
+                console.error('Error loading schemas:', error);
+                sqlFileSelect.innerHTML = `<option value="">Error loading schemas: ${error.message}</option>`;
+            }
+        }
+
+        // Extract schema for a SQL file
+        async function extractSchema(filename, buttonElement) {
+            const originalText = buttonElement.innerHTML;
+            buttonElement.disabled = true;
+            buttonElement.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Extracting...';
+            
+            try {
+                const response = await fetch(`/api/schemas/extract/${encodeURIComponent(filename)}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification(data.message || `Schema extracted successfully for ${filename}`, 'success');
+                    // Reload the file list to update status
+                    await loadSQLFiles();
+                    // Reload schemas for dropdown
+                    await loadSchemas();
+                } else {
+                    showNotification(data.message || `Failed to extract schema for ${filename}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error extracting schema:', error);
+                showNotification(`Error extracting schema: ${error.message}`, 'error');
+            } finally {
+                buttonElement.disabled = false;
+                buttonElement.innerHTML = originalText;
+            }
+        }
+
         // Select file
-        function selectFile(filename) {
+        function selectFile(filename, event) {
             selectedFile = filename;
             document.querySelectorAll('.file-item').forEach(item => {
                 item.classList.remove('selected');
             });
-            event.currentTarget.classList.add('selected');
+            if (event && event.currentTarget) {
+                event.currentTarget.closest('.file-item')?.classList.add('selected');
+            } else {
+                // Find the file item by filename
+                document.querySelectorAll('.file-item').forEach(item => {
+                    if (item.textContent.includes(filename)) {
+                        item.classList.add('selected');
+                    }
+                });
+            }
         }
 
         // Check system status
@@ -829,6 +965,7 @@
         // Refresh files
         refreshBtn.addEventListener('click', () => {
             loadSQLFiles();
+            loadSchemas();
             showNotification('File list refreshed', 'info');
         });
 

@@ -1,0 +1,1359 @@
+{
+  "filename": "fars_database.sql",
+  "file_path": "C:\\Users\\yzyja\\OneDrive - VTTI\\Documents\\GitHub\\RAGbot\\SQL\\fars_database.sql",
+  "file_size": 1180282057,
+  "database_name": "fars",
+  "total_tables": 3,
+  "insert_info": {
+    "vehicle_master": 1136
+  },
+  "table_schemas": {
+    "accident_master": {
+      "name": "accident_master",
+      "create_statement": "CREATE TABLE `accident_master` (\n`ST_CASE` bigint DEFAULT NULL,\n  `PEDS` double DEFAULT NULL,\n  `PERNOTMVIT` double DEFAULT NULL,\n  `VE_TOTAL` double DEFAULT NULL,\n  `VE_FORMS` bigint DEFAULT NULL,\n  `PVH_INVL` double DEFAULT NULL,\n  `PERSONS` bigint DEFAULT NULL,\n  `PERMVIT` double DEFAULT NULL,\n  `COUNTY` bigint DEFAULT NULL,\n  `CITY` bigint DEFAULT NULL,\n  `MONTH` bigint DEFAULT NULL,\n  `DAY` bigint DEFAULT NULL,\n  `DAY_WEEK` bigint DEFAULT NULL,\n  `YEAR` bigint DEFAULT NULL,\n  `HOUR` bigint DEFAULT NULL,\n  `MINUTE` bigint DEFAULT NULL,\n  `TWAY_ID` text,\n  `TWAY_ID2` text,\n  `CL_TWAY` double DEFAULT NULL,\n  `ROUTE` double DEFAULT NULL,\n  `RUR_URB` double DEFAULT NULL,\n  `FUNC_SYS` double DEFAULT NULL,\n  `RD_OWNER` double DEFAULT NULL,\n  `NHS` double DEFAULT NULL,\n  `SP_JUR` bigint DEFAULT NULL,\n  `MILEPT` double DEFAULT NULL,\n  `LATITUDE` double DEFAULT NULL,\n  `LONGITUD` double DEFAULT NULL,\n  `HARM_EV` bigint DEFAULT NULL,\n  `MAN_COLL` bigint DEFAULT NULL,\n  `RELJCT1` double DEFAULT NULL,\n  `REL_JUNC` double DEFAULT NULL,\n  `RELJCT2` double DEFAULT NULL,\n  `TYP_INT` double DEFAULT NULL,\n  `REL_ROAD` bigint DEFAULT NULL,\n  `C_M_ZONE` double DEFAULT NULL,\n  `WRK_ZONE` double DEFAULT NULL,\n  `LGT_COND` bigint DEFAULT NULL,\n  `WEATHER` bigint DEFAULT NULL,\n  `SCH_BUS` double DEFAULT NULL,\n  `RAIL` text,\n  `NOT_HOUR` bigint DEFAULT NULL,\n  `NOT_MIN` bigint DEFAULT NULL,\n  `ARR_HOUR` bigint DEFAULT NULL,\n  `ARR_MIN` bigint DEFAULT NULL,\n  `HOSP_HR` double DEFAULT NULL,\n  `HOSP_MN` double DEFAULT NULL,\n  `FATALS` bigint DEFAULT NULL\n)",
+      "schema_description": "Table: accident_master\nNumber of Columns: 48\n\nColumns:\n  1. ST_CASE (BIGINT) - DEFAULT NULL\n  2. PEDS (DOUBLE) - DEFAULT NULL\n  3. PERNOTMVIT (DOUBLE) - DEFAULT NULL\n  4. VE_TOTAL (DOUBLE) - DEFAULT NULL\n  5. VE_FORMS (BIGINT) - DEFAULT NULL\n  6. PVH_INVL (DOUBLE) - DEFAULT NULL\n  7. PERSONS (BIGINT) - DEFAULT NULL\n  8. PERMVIT (DOUBLE) - DEFAULT NULL\n  9. COUNTY (BIGINT) - DEFAULT NULL\n  10. CITY (BIGINT) - DEFAULT NULL\n  11. MONTH (BIGINT) - DEFAULT NULL\n  12. DAY (BIGINT) - DEFAULT NULL\n  13. DAY_WEEK (BIGINT) - DEFAULT NULL\n  14. YEAR (BIGINT) - DEFAULT NULL\n  15. HOUR (BIGINT) - DEFAULT NULL\n  16. MINUTE (BIGINT) - DEFAULT NULL\n  17. TWAY_ID (TEXT)\n  18. TWAY_ID2 (TEXT)\n  19. CL_TWAY (DOUBLE) - DEFAULT NULL\n  20. ROUTE (DOUBLE) - DEFAULT NULL\n  21. RUR_URB (DOUBLE) - DEFAULT NULL\n  22. FUNC_SYS (DOUBLE) - DEFAULT NULL\n  23. RD_OWNER (DOUBLE) - DEFAULT NULL\n  24. NHS (DOUBLE) - DEFAULT NULL\n  25. SP_JUR (BIGINT) - DEFAULT NULL\n  26. MILEPT (DOUBLE) - DEFAULT NULL\n  27. LATITUDE (DOUBLE) - DEFAULT NULL\n  28. LONGITUD (DOUBLE) - DEFAULT NULL\n  29. HARM_EV (BIGINT) - DEFAULT NULL\n  30. MAN_COLL (BIGINT) - DEFAULT NULL\n  31. RELJCT1 (DOUBLE) - DEFAULT NULL\n  32. REL_JUNC (DOUBLE) - DEFAULT NULL\n  33. RELJCT2 (DOUBLE) - DEFAULT NULL\n  34. TYP_INT (DOUBLE) - DEFAULT NULL\n  35. REL_ROAD (BIGINT) - DEFAULT NULL\n  36. C_M_ZONE (DOUBLE) - DEFAULT NULL\n  37. WRK_ZONE (DOUBLE) - DEFAULT NULL\n  38. LGT_COND (BIGINT) - DEFAULT NULL\n  39. WEATHER (BIGINT) - DEFAULT NULL\n  40. SCH_BUS (DOUBLE) - DEFAULT NULL\n  41. RAIL (TEXT)\n  42. NOT_HOUR (BIGINT) - DEFAULT NULL\n  43. NOT_MIN (BIGINT) - DEFAULT NULL\n  44. ARR_HOUR (BIGINT) - DEFAULT NULL\n  45. ARR_MIN (BIGINT) - DEFAULT NULL\n  46. HOSP_HR (DOUBLE) - DEFAULT NULL\n  47. HOSP_MN (DOUBLE) - DEFAULT NULL\n  48. FATALS (BIGINT) - DEFAULT NULL\n\nCREATE TABLE Statement:\nCREATE TABLE `accident_master` (\n`ST_CASE` bigint DEFAULT NULL,\n  `PEDS` double DEFAULT NULL,\n  `PERNOTMVIT` double DEFAULT NULL,\n  `VE_TOTAL` double DEFAULT NULL,\n  `VE_FORMS` bigint DEFAULT NULL,\n  `PVH_INVL` double DEFAULT NULL,\n  `PERSONS` bigint DEFAULT NULL,\n  `PERMVIT` double DEFAULT NULL,\n  `COUNTY` bigint DEFAULT NULL,\n  `CITY` bigint DEFAULT NULL,\n  `MONTH` bigint DEFAULT NULL,\n  `DAY` bigint DEFAULT NULL,\n  `DAY_WEEK` bigint DEFAULT NULL,\n  `YEAR` bigint DEFAULT NULL,\n  `HOUR` bigint DEFAULT NULL,\n  `MINUTE` bigint DEFAULT NULL,\n  `TWAY_ID` text,\n  `TWAY_ID2` text,\n  `CL_TWAY` double DEFAULT NULL,\n  `ROUTE` double DEFAULT NULL,\n  `RUR_URB` double DEFAULT NULL,\n  `FUNC_SYS` double DEFAULT NULL,\n  `RD_OWNER` double DEFAULT NULL,\n  `NHS` double DEFAULT NULL,\n  `SP_JUR` bigint DEFAULT NULL,\n  `MILEPT` double DEFAULT NULL,\n  `LATITUDE` double DEFAULT NULL,\n  `LONGITUD` double DEFAULT NULL,\n  `HARM_EV` bigint DEFAULT NULL,\n  `MAN_COLL` bigint DEFAULT NULL,\n  `RELJCT1` double DEFAULT NULL,\n  `REL_JUNC` double DEFAULT NULL,\n  `RELJCT2` double DEFAULT NULL,\n  `TYP_INT` double DEFAULT NULL,\n  `REL_ROAD` bigint DEFAULT NULL,\n  `C_M_ZONE` double DEFAULT NULL,\n  `WRK_ZONE` double DEFAULT NULL,\n  `LGT_COND` bigint DEFAULT NULL,\n  `WEATHER` bigint DEFAULT NULL,\n  `SCH_BUS` double DEFAULT NULL,\n  `RAIL` text,\n  `NOT_HOUR` bigint DEFAULT NULL,\n  `NOT_MIN` bigint DEFAULT NULL,\n  `ARR_HOUR` bigint DEFAULT NULL,\n  `ARR_MIN` bigint DEFAULT NULL,\n  `HOSP_HR` double DEFAULT NULL,\n  `HOSP_MN` double DEFAULT NULL,\n  `FATALS` bigint DEFAULT NULL\n)\n",
+      "column_count": 48,
+      "columns": [
+        {
+          "name": "ST_CASE",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PEDS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PERNOTMVIT",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VE_TOTAL",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VE_FORMS",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PVH_INVL",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PERSONS",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PERMVIT",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "COUNTY",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "CITY",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "MONTH",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DAY",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DAY_WEEK",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "YEAR",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HOUR",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "MINUTE",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "TWAY_ID",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "TWAY_ID2",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "CL_TWAY",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ROUTE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "RUR_URB",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "FUNC_SYS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "RD_OWNER",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "NHS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "SP_JUR",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "MILEPT",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "LATITUDE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "LONGITUD",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HARM_EV",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "MAN_COLL",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "RELJCT1",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "REL_JUNC",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "RELJCT2",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "TYP_INT",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "REL_ROAD",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "C_M_ZONE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "WRK_ZONE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "LGT_COND",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "WEATHER",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "SCH_BUS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "RAIL",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "NOT_HOUR",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "NOT_MIN",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ARR_HOUR",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ARR_MIN",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HOSP_HR",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HOSP_MN",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "FATALS",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        }
+      ]
+    },
+    "person_master": {
+      "name": "person_master",
+      "create_statement": "CREATE TABLE `person_master` (\n`ST_CASE` bigint DEFAULT NULL,\n  `AGE` bigint DEFAULT NULL,\n  `SEX` bigint DEFAULT NULL,\n  `PER_TYP` bigint DEFAULT NULL,\n  `INJ_SEV` bigint DEFAULT NULL,\n  `SEAT_POS` bigint DEFAULT NULL,\n  `REST_USE` double DEFAULT NULL,\n  `REST_MIS` double DEFAULT NULL,\n  `HELM_USE` double DEFAULT NULL,\n  `HELM_MIS` double DEFAULT NULL,\n  `AIR_BAG` double DEFAULT NULL,\n  `EJECTION` bigint DEFAULT NULL,\n  `EJ_PATH` double DEFAULT NULL,\n  `EXTRICAT` bigint DEFAULT NULL,\n  `DRINKING` double DEFAULT NULL,\n  `ALC_STATUS` double DEFAULT NULL,\n  `ATST_TYP` double DEFAULT NULL,\n  `TEST_RES` double DEFAULT NULL,\n  `ALC_RES` double DEFAULT NULL,\n  `DRUGS` double DEFAULT NULL,\n  `DSTATUS` double DEFAULT NULL,\n  `HOSPITAL` double DEFAULT NULL,\n  `DOA` double DEFAULT NULL,\n  `DEATH_MO` bigint DEFAULT NULL,\n  `DEATH_DA` bigint DEFAULT NULL,\n  `DEATH_YR` bigint DEFAULT NULL,\n  `DEATH_TM` double DEFAULT NULL,\n  `DEATH_HR` double DEFAULT NULL,\n  `DEATH_MN` double DEFAULT NULL,\n  `LAG_HRS` double DEFAULT NULL,\n  `LAG_MINS` double DEFAULT NULL,\n  `N_MOT_NO` double DEFAULT NULL,\n  `STR_VEH` double DEFAULT NULL,\n  `DEVTYPE` double DEFAULT NULL,\n  `DEVMOTOR` double DEFAULT NULL,\n  `LOCATION` bigint DEFAULT NULL,\n  `WORK_INJ` double DEFAULT NULL,\n  `HISPANIC` double DEFAULT NULL,\n  `YEAR` bigint DEFAULT NULL\n)",
+      "schema_description": "Table: person_master\nNumber of Columns: 39\n\nColumns:\n  1. ST_CASE (BIGINT) - DEFAULT NULL\n  2. AGE (BIGINT) - DEFAULT NULL\n  3. SEX (BIGINT) - DEFAULT NULL\n  4. PER_TYP (BIGINT) - DEFAULT NULL\n  5. INJ_SEV (BIGINT) - DEFAULT NULL\n  6. SEAT_POS (BIGINT) - DEFAULT NULL\n  7. REST_USE (DOUBLE) - DEFAULT NULL\n  8. REST_MIS (DOUBLE) - DEFAULT NULL\n  9. HELM_USE (DOUBLE) - DEFAULT NULL\n  10. HELM_MIS (DOUBLE) - DEFAULT NULL\n  11. AIR_BAG (DOUBLE) - DEFAULT NULL\n  12. EJECTION (BIGINT) - DEFAULT NULL\n  13. EJ_PATH (DOUBLE) - DEFAULT NULL\n  14. EXTRICAT (BIGINT) - DEFAULT NULL\n  15. DRINKING (DOUBLE) - DEFAULT NULL\n  16. ALC_STATUS (DOUBLE) - DEFAULT NULL\n  17. ATST_TYP (DOUBLE) - DEFAULT NULL\n  18. TEST_RES (DOUBLE) - DEFAULT NULL\n  19. ALC_RES (DOUBLE) - DEFAULT NULL\n  20. DRUGS (DOUBLE) - DEFAULT NULL\n  21. DSTATUS (DOUBLE) - DEFAULT NULL\n  22. HOSPITAL (DOUBLE) - DEFAULT NULL\n  23. DOA (DOUBLE) - DEFAULT NULL\n  24. DEATH_MO (BIGINT) - DEFAULT NULL\n  25. DEATH_DA (BIGINT) - DEFAULT NULL\n  26. DEATH_YR (BIGINT) - DEFAULT NULL\n  27. DEATH_TM (DOUBLE) - DEFAULT NULL\n  28. DEATH_HR (DOUBLE) - DEFAULT NULL\n  29. DEATH_MN (DOUBLE) - DEFAULT NULL\n  30. LAG_HRS (DOUBLE) - DEFAULT NULL\n  31. LAG_MINS (DOUBLE) - DEFAULT NULL\n  32. N_MOT_NO (DOUBLE) - DEFAULT NULL\n  33. STR_VEH (DOUBLE) - DEFAULT NULL\n  34. DEVTYPE (DOUBLE) - DEFAULT NULL\n  35. DEVMOTOR (DOUBLE) - DEFAULT NULL\n  36. LOCATION (BIGINT) - DEFAULT NULL\n  37. WORK_INJ (DOUBLE) - DEFAULT NULL\n  38. HISPANIC (DOUBLE) - DEFAULT NULL\n  39. YEAR (BIGINT) - DEFAULT NULL\n\nCREATE TABLE Statement:\nCREATE TABLE `person_master` (\n`ST_CASE` bigint DEFAULT NULL,\n  `AGE` bigint DEFAULT NULL,\n  `SEX` bigint DEFAULT NULL,\n  `PER_TYP` bigint DEFAULT NULL,\n  `INJ_SEV` bigint DEFAULT NULL,\n  `SEAT_POS` bigint DEFAULT NULL,\n  `REST_USE` double DEFAULT NULL,\n  `REST_MIS` double DEFAULT NULL,\n  `HELM_USE` double DEFAULT NULL,\n  `HELM_MIS` double DEFAULT NULL,\n  `AIR_BAG` double DEFAULT NULL,\n  `EJECTION` bigint DEFAULT NULL,\n  `EJ_PATH` double DEFAULT NULL,\n  `EXTRICAT` bigint DEFAULT NULL,\n  `DRINKING` double DEFAULT NULL,\n  `ALC_STATUS` double DEFAULT NULL,\n  `ATST_TYP` double DEFAULT NULL,\n  `TEST_RES` double DEFAULT NULL,\n  `ALC_RES` double DEFAULT NULL,\n  `DRUGS` double DEFAULT NULL,\n  `DSTATUS` double DEFAULT NULL,\n  `HOSPITAL` double DEFAULT NULL,\n  `DOA` double DEFAULT NULL,\n  `DEATH_MO` bigint DEFAULT NULL,\n  `DEATH_DA` bigint DEFAULT NULL,\n  `DEATH_YR` bigint DEFAULT NULL,\n  `DEATH_TM` double DEFAULT NULL,\n  `DEATH_HR` double DEFAULT NULL,\n  `DEATH_MN` double DEFAULT NULL,\n  `LAG_HRS` double DEFAULT NULL,\n  `LAG_MINS` double DEFAULT NULL,\n  `N_MOT_NO` double DEFAULT NULL,\n  `STR_VEH` double DEFAULT NULL,\n  `DEVTYPE` double DEFAULT NULL,\n  `DEVMOTOR` double DEFAULT NULL,\n  `LOCATION` bigint DEFAULT NULL,\n  `WORK_INJ` double DEFAULT NULL,\n  `HISPANIC` double DEFAULT NULL,\n  `YEAR` bigint DEFAULT NULL\n)\n",
+      "column_count": 39,
+      "columns": [
+        {
+          "name": "ST_CASE",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "AGE",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "SEX",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PER_TYP",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "INJ_SEV",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "SEAT_POS",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "REST_USE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "REST_MIS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HELM_USE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HELM_MIS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "AIR_BAG",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "EJECTION",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "EJ_PATH",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "EXTRICAT",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DRINKING",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ALC_STATUS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ATST_TYP",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "TEST_RES",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ALC_RES",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DRUGS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DSTATUS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HOSPITAL",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DOA",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DEATH_MO",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DEATH_DA",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DEATH_YR",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DEATH_TM",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DEATH_HR",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DEATH_MN",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "LAG_HRS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "LAG_MINS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "N_MOT_NO",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "STR_VEH",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DEVTYPE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DEVMOTOR",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "LOCATION",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "WORK_INJ",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HISPANIC",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "YEAR",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        }
+      ]
+    },
+    "vehicle_master": {
+      "name": "vehicle_master",
+      "create_statement": "CREATE TABLE `vehicle_master` (\n`ST_CASE` bigint DEFAULT NULL,\n  `OCUPANTS` double DEFAULT NULL,\n  `NUMOCCS` double DEFAULT NULL,\n  `UNITTYPE` double DEFAULT NULL,\n  `HIT_RUN` bigint DEFAULT NULL,\n  `REG_STAT` double DEFAULT NULL,\n  `OWNER` double DEFAULT NULL,\n  `VIN` text,\n  `MOD_YEAR` bigint DEFAULT NULL,\n  `VPICMAKE` double DEFAULT NULL,\n  `VPICMODEL` double DEFAULT NULL,\n  `VPICBODYCLASS` double DEFAULT NULL,\n  `MAKE` bigint DEFAULT NULL,\n  `MODEL` bigint DEFAULT NULL,\n  `BODY_TYP` bigint DEFAULT NULL,\n  `ICFINALBODY` double DEFAULT NULL,\n  `GVWR_FROM` double DEFAULT NULL,\n  `GVWR_TO` double DEFAULT NULL,\n  `TOW_VEH` double DEFAULT NULL,\n  `TRLR1VIN` text,\n  `TRLR2VIN` text,\n  `TRLR3VIN` text,\n  `TRLR1GVWR` double DEFAULT NULL,\n  `TRLR2GVWR` double DEFAULT NULL,\n  `TRLR3GVWR` double DEFAULT NULL,\n  `J_KNIFE` double DEFAULT NULL,\n  `MCARR_ID` text,\n  `MCARR_I1` double DEFAULT NULL,\n  `MCARR_I2` text,\n  `V_CONFIG` double DEFAULT NULL,\n  `CARGO_BT` double DEFAULT NULL,\n  `HAZ_INV` double DEFAULT NULL,\n  `HAZ_PLAC` double DEFAULT NULL,\n  `HAZ_ID` double DEFAULT NULL,\n  `HAZ_CNO` double DEFAULT NULL,\n  `HAZ_REL` double DEFAULT NULL,\n  `BUS_USE` double DEFAULT NULL,\n  `SPEC_USE` double DEFAULT NULL,\n  `EMER_USE` double DEFAULT NULL,\n  `TRAV_SP` double DEFAULT NULL,\n  `UNDEROVERRIDE` double DEFAULT NULL,\n  `ROLLOVER` double DEFAULT NULL,\n  `ROLINLOC` double DEFAULT NULL,\n  `IMPACT1` double DEFAULT NULL,\n  `DEFORMED` double DEFAULT NULL,\n  `TOWAWAY` double DEFAULT NULL,\n  `TOWED` double DEFAULT NULL,\n  `M_HARM` double DEFAULT NULL,\n  `FIRE_EXP` double DEFAULT NULL,\n  `ADS_PRES` double DEFAULT NULL,\n  `ADS_LEV` double DEFAULT NULL,\n  `ADS_ENG` double DEFAULT NULL,\n  `MAK_MOD` bigint DEFAULT NULL,\n  `VIN_1` text,\n  `VIN_2` text,\n  `VIN_3` text,\n  `VIN_4` text,\n  `VIN_5` text,\n  `VIN_6` text,\n  `VIN_7` text,\n  `VIN_8` text,\n  `VIN_9` text,\n  `VIN_10` text,\n  `VIN_11` text,\n  `VIN_12` text,\n  `DEATHS` double DEFAULT NULL,\n  `DR_DRINK` bigint DEFAULT NULL,\n  `DR_PRES` bigint DEFAULT NULL,\n  `L_STATE` double DEFAULT NULL,\n  `DR_ZIP` double DEFAULT NULL,\n  `L_TYPE` double DEFAULT NULL,\n  `L_STATUS` double DEFAULT NULL,\n  `CDL_STAT` double DEFAULT NULL,\n  `L_ENDORS` double DEFAULT NULL,\n  `L_CL_VEH` double DEFAULT NULL,\n  `L_COMPL` double DEFAULT NULL,\n  `L_RESTRI` double DEFAULT NULL,\n  `DR_HGT` double DEFAULT NULL,\n  `DR_WGT` double DEFAULT NULL,\n  `PREV_ACC` double DEFAULT NULL,\n  `PREV_SUS1` double DEFAULT NULL,\n  `PREV_SUS2` double DEFAULT NULL,\n  `PREV_SUS3` double DEFAULT NULL,\n  `PREV_DWI` double DEFAULT NULL,\n  `PREV_SPD` double DEFAULT NULL,\n  `PREV_OTH` double DEFAULT NULL,\n  `FIRST_MO` double DEFAULT NULL,\n  `FIRST_YR` double DEFAULT NULL,\n  `LAST_MO` double DEFAULT NULL,\n  `LAST_YR` double DEFAULT NULL,\n  `SPEEDREL` double DEFAULT NULL,\n  `VTRAFWAY` double DEFAULT NULL,\n  `VNUM_LAN` double DEFAULT NULL,\n  `VSPD_LIM` double DEFAULT NULL,\n  `VALIGN` double DEFAULT NULL,\n  `VPROFILE` double DEFAULT NULL,\n  `VPAVETYP` double DEFAULT NULL,\n  `VSURCOND` double DEFAULT NULL,\n  `VTRAFCON` double DEFAULT NULL,\n  `VTCONT_F` double DEFAULT NULL,\n  `P_CRASH1` double DEFAULT NULL,\n  `P_CRASH2` double DEFAULT NULL,\n  `P_CRASH3` double DEFAULT NULL,\n  `PCRASH4` double DEFAULT NULL,\n  `PCRASH5` double DEFAULT NULL,\n  `ACC_TYPE` double DEFAULT NULL,\n  `ACC_CONFIG` double DEFAULT NULL,\n  `YEAR` bigint DEFAULT NULL\n)",
+      "schema_description": "Table: vehicle_master\nNumber of Columns: 108\n\nColumns:\n  1. ST_CASE (BIGINT) - DEFAULT NULL\n  2. OCUPANTS (DOUBLE) - DEFAULT NULL\n  3. NUMOCCS (DOUBLE) - DEFAULT NULL\n  4. UNITTYPE (DOUBLE) - DEFAULT NULL\n  5. HIT_RUN (BIGINT) - DEFAULT NULL\n  6. REG_STAT (DOUBLE) - DEFAULT NULL\n  7. OWNER (DOUBLE) - DEFAULT NULL\n  8. VIN (TEXT)\n  9. MOD_YEAR (BIGINT) - DEFAULT NULL\n  10. VPICMAKE (DOUBLE) - DEFAULT NULL\n  11. VPICMODEL (DOUBLE) - DEFAULT NULL\n  12. VPICBODYCLASS (DOUBLE) - DEFAULT NULL\n  13. MAKE (BIGINT) - DEFAULT NULL\n  14. MODEL (BIGINT) - DEFAULT NULL\n  15. BODY_TYP (BIGINT) - DEFAULT NULL\n  16. ICFINALBODY (DOUBLE) - DEFAULT NULL\n  17. GVWR_FROM (DOUBLE) - DEFAULT NULL\n  18. GVWR_TO (DOUBLE) - DEFAULT NULL\n  19. TOW_VEH (DOUBLE) - DEFAULT NULL\n  20. TRLR1VIN (TEXT)\n  21. TRLR2VIN (TEXT)\n  22. TRLR3VIN (TEXT)\n  23. TRLR1GVWR (DOUBLE) - DEFAULT NULL\n  24. TRLR2GVWR (DOUBLE) - DEFAULT NULL\n  25. TRLR3GVWR (DOUBLE) - DEFAULT NULL\n  26. J_KNIFE (DOUBLE) - DEFAULT NULL\n  27. MCARR_ID (TEXT)\n  28. MCARR_I1 (DOUBLE) - DEFAULT NULL\n  29. MCARR_I2 (TEXT)\n  30. V_CONFIG (DOUBLE) - DEFAULT NULL\n  31. CARGO_BT (DOUBLE) - DEFAULT NULL\n  32. HAZ_INV (DOUBLE) - DEFAULT NULL\n  33. HAZ_PLAC (DOUBLE) - DEFAULT NULL\n  34. HAZ_ID (DOUBLE) - DEFAULT NULL\n  35. HAZ_CNO (DOUBLE) - DEFAULT NULL\n  36. HAZ_REL (DOUBLE) - DEFAULT NULL\n  37. BUS_USE (DOUBLE) - DEFAULT NULL\n  38. SPEC_USE (DOUBLE) - DEFAULT NULL\n  39. EMER_USE (DOUBLE) - DEFAULT NULL\n  40. TRAV_SP (DOUBLE) - DEFAULT NULL\n  41. UNDEROVERRIDE (DOUBLE) - DEFAULT NULL\n  42. ROLLOVER (DOUBLE) - DEFAULT NULL\n  43. ROLINLOC (DOUBLE) - DEFAULT NULL\n  44. IMPACT1 (DOUBLE) - DEFAULT NULL\n  45. DEFORMED (DOUBLE) - DEFAULT NULL\n  46. TOWAWAY (DOUBLE) - DEFAULT NULL\n  47. TOWED (DOUBLE) - DEFAULT NULL\n  48. M_HARM (DOUBLE) - DEFAULT NULL\n  49. FIRE_EXP (DOUBLE) - DEFAULT NULL\n  50. ADS_PRES (DOUBLE) - DEFAULT NULL\n  51. ADS_LEV (DOUBLE) - DEFAULT NULL\n  52. ADS_ENG (DOUBLE) - DEFAULT NULL\n  53. MAK_MOD (BIGINT) - DEFAULT NULL\n  54. VIN_1 (TEXT)\n  55. VIN_2 (TEXT)\n  56. VIN_3 (TEXT)\n  57. VIN_4 (TEXT)\n  58. VIN_5 (TEXT)\n  59. VIN_6 (TEXT)\n  60. VIN_7 (TEXT)\n  61. VIN_8 (TEXT)\n  62. VIN_9 (TEXT)\n  63. VIN_10 (TEXT)\n  64. VIN_11 (TEXT)\n  65. VIN_12 (TEXT)\n  66. DEATHS (DOUBLE) - DEFAULT NULL\n  67. DR_DRINK (BIGINT) - DEFAULT NULL\n  68. DR_PRES (BIGINT) - DEFAULT NULL\n  69. L_STATE (DOUBLE) - DEFAULT NULL\n  70. DR_ZIP (DOUBLE) - DEFAULT NULL\n  71. L_TYPE (DOUBLE) - DEFAULT NULL\n  72. L_STATUS (DOUBLE) - DEFAULT NULL\n  73. CDL_STAT (DOUBLE) - DEFAULT NULL\n  74. L_ENDORS (DOUBLE) - DEFAULT NULL\n  75. L_CL_VEH (DOUBLE) - DEFAULT NULL\n  76. L_COMPL (DOUBLE) - DEFAULT NULL\n  77. L_RESTRI (DOUBLE) - DEFAULT NULL\n  78. DR_HGT (DOUBLE) - DEFAULT NULL\n  79. DR_WGT (DOUBLE) - DEFAULT NULL\n  80. PREV_ACC (DOUBLE) - DEFAULT NULL\n  81. PREV_SUS1 (DOUBLE) - DEFAULT NULL\n  82. PREV_SUS2 (DOUBLE) - DEFAULT NULL\n  83. PREV_SUS3 (DOUBLE) - DEFAULT NULL\n  84. PREV_DWI (DOUBLE) - DEFAULT NULL\n  85. PREV_SPD (DOUBLE) - DEFAULT NULL\n  86. PREV_OTH (DOUBLE) - DEFAULT NULL\n  87. FIRST_MO (DOUBLE) - DEFAULT NULL\n  88. FIRST_YR (DOUBLE) - DEFAULT NULL\n  89. LAST_MO (DOUBLE) - DEFAULT NULL\n  90. LAST_YR (DOUBLE) - DEFAULT NULL\n  91. SPEEDREL (DOUBLE) - DEFAULT NULL\n  92. VTRAFWAY (DOUBLE) - DEFAULT NULL\n  93. VNUM_LAN (DOUBLE) - DEFAULT NULL\n  94. VSPD_LIM (DOUBLE) - DEFAULT NULL\n  95. VALIGN (DOUBLE) - DEFAULT NULL\n  96. VPROFILE (DOUBLE) - DEFAULT NULL\n  97. VPAVETYP (DOUBLE) - DEFAULT NULL\n  98. VSURCOND (DOUBLE) - DEFAULT NULL\n  99. VTRAFCON (DOUBLE) - DEFAULT NULL\n  100. VTCONT_F (DOUBLE) - DEFAULT NULL\n  101. P_CRASH1 (DOUBLE) - DEFAULT NULL\n  102. P_CRASH2 (DOUBLE) - DEFAULT NULL\n  103. P_CRASH3 (DOUBLE) - DEFAULT NULL\n  104. PCRASH4 (DOUBLE) - DEFAULT NULL\n  105. PCRASH5 (DOUBLE) - DEFAULT NULL\n  106. ACC_TYPE (DOUBLE) - DEFAULT NULL\n  107. ACC_CONFIG (DOUBLE) - DEFAULT NULL\n  108. YEAR (BIGINT) - DEFAULT NULL\n\nCREATE TABLE Statement:\nCREATE TABLE `vehicle_master` (\n`ST_CASE` bigint DEFAULT NULL,\n  `OCUPANTS` double DEFAULT NULL,\n  `NUMOCCS` double DEFAULT NULL,\n  `UNITTYPE` double DEFAULT NULL,\n  `HIT_RUN` bigint DEFAULT NULL,\n  `REG_STAT` double DEFAULT NULL,\n  `OWNER` double DEFAULT NULL,\n  `VIN` text,\n  `MOD_YEAR` bigint DEFAULT NULL,\n  `VPICMAKE` double DEFAULT NULL,\n  `VPICMODEL` double DEFAULT NULL,\n  `VPICBODYCLASS` double DEFAULT NULL,\n  `MAKE` bigint DEFAULT NULL,\n  `MODEL` bigint DEFAULT NULL,\n  `BODY_TYP` bigint DEFAULT NULL,\n  `ICFINALBODY` double DEFAULT NULL,\n  `GVWR_FROM` double DEFAULT NULL,\n  `GVWR_TO` double DEFAULT NULL,\n  `TOW_VEH` double DEFAULT NULL,\n  `TRLR1VIN` text,\n  `TRLR2VIN` text,\n  `TRLR3VIN` text,\n  `TRLR1GVWR` double DEFAULT NULL,\n  `TRLR2GVWR` double DEFAULT NULL,\n  `TRLR3GVWR` double DEFAULT NULL,\n  `J_KNIFE` double DEFAULT NULL,\n  `MCARR_ID` text,\n  `MCARR_I1` double DEFAULT NULL,\n  `MCARR_I2` text,\n  `V_CONFIG` double DEFAULT NULL,\n  `CARGO_BT` double DEFAULT NULL,\n  `HAZ_INV` double DEFAULT NULL,\n  `HAZ_PLAC` double DEFAULT NULL,\n  `HAZ_ID` double DEFAULT NULL,\n  `HAZ_CNO` double DEFAULT NULL,\n  `HAZ_REL` double DEFAULT NULL,\n  `BUS_USE` double DEFAULT NULL,\n  `SPEC_USE` double DEFAULT NULL,\n  `EMER_USE` double DEFAULT NULL,\n  `TRAV_SP` double DEFAULT NULL,\n  `UNDEROVERRIDE` double DEFAULT NULL,\n  `ROLLOVER` double DEFAULT NULL,\n  `ROLINLOC` double DEFAULT NULL,\n  `IMPACT1` double DEFAULT NULL,\n  `DEFORMED` double DEFAULT NULL,\n  `TOWAWAY` double DEFAULT NULL,\n  `TOWED` double DEFAULT NULL,\n  `M_HARM` double DEFAULT NULL,\n  `FIRE_EXP` double DEFAULT NULL,\n  `ADS_PRES` double DEFAULT NULL,\n  `ADS_LEV` double DEFAULT NULL,\n  `ADS_ENG` double DEFAULT NULL,\n  `MAK_MOD` bigint DEFAULT NULL,\n  `VIN_1` text,\n  `VIN_2` text,\n  `VIN_3` text,\n  `VIN_4` text,\n  `VIN_5` text,\n  `VIN_6` text,\n  `VIN_7` text,\n  `VIN_8` text,\n  `VIN_9` text,\n  `VIN_10` text,\n  `VIN_11` text,\n  `VIN_12` text,\n  `DEATHS` double DEFAULT NULL,\n  `DR_DRINK` bigint DEFAULT NULL,\n  `DR_PRES` bigint DEFAULT NULL,\n  `L_STATE` double DEFAULT NULL,\n  `DR_ZIP` double DEFAULT NULL,\n  `L_TYPE` double DEFAULT NULL,\n  `L_STATUS` double DEFAULT NULL,\n  `CDL_STAT` double DEFAULT NULL,\n  `L_ENDORS` double DEFAULT NULL,\n  `L_CL_VEH` double DEFAULT NULL,\n  `L_COMPL` double DEFAULT NULL,\n  `L_RESTRI` double DEFAULT NULL,\n  `DR_HGT` double DEFAULT NULL,\n  `DR_WGT` double DEFAULT NULL,\n  `PREV_ACC` double DEFAULT NULL,\n  `PREV_SUS1` double DEFAULT NULL,\n  `PREV_SUS2` double DEFAULT NULL,\n  `PREV_SUS3` double DEFAULT NULL,\n  `PREV_DWI` double DEFAULT NULL,\n  `PREV_SPD` double DEFAULT NULL,\n  `PREV_OTH` double DEFAULT NULL,\n  `FIRST_MO` double DEFAULT NULL,\n  `FIRST_YR` double DEFAULT NULL,\n  `LAST_MO` double DEFAULT NULL,\n  `LAST_YR` double DEFAULT NULL,\n  `SPEEDREL` double DEFAULT NULL,\n  `VTRAFWAY` double DEFAULT NULL,\n  `VNUM_LAN` double DEFAULT NULL,\n  `VSPD_LIM` double DEFAULT NULL,\n  `VALIGN` double DEFAULT NULL,\n  `VPROFILE` double DEFAULT NULL,\n  `VPAVETYP` double DEFAULT NULL,\n  `VSURCOND` double DEFAULT NULL,\n  `VTRAFCON` double DEFAULT NULL,\n  `VTCONT_F` double DEFAULT NULL,\n  `P_CRASH1` double DEFAULT NULL,\n  `P_CRASH2` double DEFAULT NULL,\n  `P_CRASH3` double DEFAULT NULL,\n  `PCRASH4` double DEFAULT NULL,\n  `PCRASH5` double DEFAULT NULL,\n  `ACC_TYPE` double DEFAULT NULL,\n  `ACC_CONFIG` double DEFAULT NULL,\n  `YEAR` bigint DEFAULT NULL\n)\n",
+      "column_count": 108,
+      "columns": [
+        {
+          "name": "ST_CASE",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "OCUPANTS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "NUMOCCS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "UNITTYPE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HIT_RUN",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "REG_STAT",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "OWNER",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VIN",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "MOD_YEAR",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VPICMAKE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VPICMODEL",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VPICBODYCLASS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "MAKE",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "MODEL",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "BODY_TYP",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ICFINALBODY",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "GVWR_FROM",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "GVWR_TO",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "TOW_VEH",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "TRLR1VIN",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "TRLR2VIN",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "TRLR3VIN",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "TRLR1GVWR",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "TRLR2GVWR",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "TRLR3GVWR",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "J_KNIFE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "MCARR_ID",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "MCARR_I1",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "MCARR_I2",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "V_CONFIG",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "CARGO_BT",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HAZ_INV",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HAZ_PLAC",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HAZ_ID",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HAZ_CNO",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "HAZ_REL",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "BUS_USE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "SPEC_USE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "EMER_USE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "TRAV_SP",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "UNDEROVERRIDE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ROLLOVER",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ROLINLOC",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "IMPACT1",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DEFORMED",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "TOWAWAY",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "TOWED",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "M_HARM",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "FIRE_EXP",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ADS_PRES",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ADS_LEV",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ADS_ENG",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "MAK_MOD",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VIN_1",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "VIN_2",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "VIN_3",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "VIN_4",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "VIN_5",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "VIN_6",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "VIN_7",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "VIN_8",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "VIN_9",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "VIN_10",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "VIN_11",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "VIN_12",
+          "type": "TEXT",
+          "constraints": []
+        },
+        {
+          "name": "DEATHS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DR_DRINK",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DR_PRES",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "L_STATE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DR_ZIP",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "L_TYPE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "L_STATUS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "CDL_STAT",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "L_ENDORS",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "L_CL_VEH",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "L_COMPL",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "L_RESTRI",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DR_HGT",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "DR_WGT",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PREV_ACC",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PREV_SUS1",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PREV_SUS2",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PREV_SUS3",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PREV_DWI",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PREV_SPD",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PREV_OTH",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "FIRST_MO",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "FIRST_YR",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "LAST_MO",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "LAST_YR",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "SPEEDREL",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VTRAFWAY",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VNUM_LAN",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VSPD_LIM",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VALIGN",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VPROFILE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VPAVETYP",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VSURCOND",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VTRAFCON",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "VTCONT_F",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "P_CRASH1",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "P_CRASH2",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "P_CRASH3",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PCRASH4",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "PCRASH5",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ACC_TYPE",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "ACC_CONFIG",
+          "type": "DOUBLE",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        },
+        {
+          "name": "YEAR",
+          "type": "BIGINT",
+          "constraints": [
+            "DEFAULT NULL"
+          ]
+        }
+      ]
+    }
+  }
+}
